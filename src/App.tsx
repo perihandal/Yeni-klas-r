@@ -40,6 +40,11 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [zoomToGeometry, setZoomToGeometry] = useState<{ wkt: string; name?: string } | null>(null);
 
+  // Debug için state değişikliklerini takip et
+  useEffect(() => {
+    console.log(`🔍 Debug - addMode: ${addMode}, popupOpen: ${popupOpen}, geometryType: ${addMode && !popupOpen ? geometryType : ""}`);
+  }, [addMode, popupOpen, geometryType]);
+
   // Geometrileri çek
   useEffect(() => {
     setLoading(true);
@@ -383,16 +388,18 @@ const App: React.FC = () => {
               </button>
             </div>
           )}
+
                       <ErrorBoundary>
                         <MapView
                           key={`map-${listModalOpen ? 'modal-open' : 'modal-closed'}`}
-                          geometryType={addMode ? geometryType : ""}
+                          geometryType={addMode && !popupOpen ? geometryType : ""}
                           onDrawEnd={handleDrawEnd}
                           geometries={geometries}
                           zoomToGeometry={zoomToGeometry}
                           onDeleteGeometry={handleDeleteGeometry}
                           onUpdateGeometry={handleUpdateGeometry}
                           onMoveGeometry={handleMoveGeometry}
+                          popupOpen={popupOpen}
                         />
                       </ErrorBoundary>
         </div>
@@ -404,6 +411,7 @@ const App: React.FC = () => {
           onClose={() => {
             setPopupOpen(false);
             setEditingGeometry(null); // Modal kapandığında editing state'ini temizle
+            setAddMode(false); // Modal kapandığında çizim modunu kapat
           }}
           onSave={async (data) => {
             setLoading(true);
@@ -411,7 +419,7 @@ const App: React.FC = () => {
               if (editingGeometry) {
                 // Güncelleme işlemi
                 console.log("🔄 Geometri güncelleniyor:", editingGeometry.id);
-                await updateGeometry(editingGeometry.id, {
+                const response = await updateGeometry(editingGeometry.id, {
                   name: data.name,
                   fullAddress: data.fullAddress,
                   phone: data.phone,
@@ -421,12 +429,14 @@ const App: React.FC = () => {
                   wkt: data.wkt,
                   type: data.type
                 });
-                console.log("✅ Geometri başarıyla güncellendi");
+                console.log("✅ Geometri başarıyla güncellendi, response:", response);
+                
+
                 setEditingGeometry(null);
               } else {
                 // Yeni kayıt işlemi
                 console.log("➕ Yeni geometri ekleniyor");
-                await addGeometry({
+                const response = await addGeometry({
                   name: data.name,
                   fullAddress: data.fullAddress,
                   phone: data.phone,
@@ -436,10 +446,13 @@ const App: React.FC = () => {
                   wkt: data.wkt,
                   type: data.type
                 });
-                console.log("✅ Yeni geometri başarıyla eklendi");
+                console.log("✅ Yeni geometri başarıyla eklendi, response:", response);
+                
+
               }
               
               setPopupOpen(false);
+              setAddMode(false); // İşlem tamamlandığında çizim modunu kapat
               // İşlem sonrası geometrileri yenile
               console.log('🔄 Geometriler yenileniyor...');
               await refreshGeometries();

@@ -3,6 +3,7 @@ import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
 import OSM from "ol/source/OSM";
+import { get as getProjection, transform } from "ol/proj";
 import "ol/ol.css";
 
 import Draw from "ol/interaction/Draw";
@@ -41,6 +42,7 @@ interface MapViewProps {
   onDeleteGeometry?: (id: number) => void;
   onUpdateGeometry?: (geometry: GeometryItem) => void;
   onMoveGeometry?: (id: number, newWkt: string) => void;
+  popupOpen?: boolean; // Popup durumu
 }
 
 // Pin/marker stillerini oluştur
@@ -129,7 +131,8 @@ const MapView: React.FC<MapViewProps> = ({
   zoomToGeometry = null,
   onDeleteGeometry,
   onUpdateGeometry,
-  onMoveGeometry
+  onMoveGeometry,
+  popupOpen = false
 }) => {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstance = useRef<Map | null>(null);
@@ -138,7 +141,7 @@ const MapView: React.FC<MapViewProps> = ({
   const vectorSourceRef = useRef<VectorSource | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
   const popupOverlayRef = useRef<Overlay | null>(null);
-  const [mapInitialized, setMapInitialized] = React.useState(false);
+  const [mapInitialized, setMapInitialized] = React.useState(true);
   const [mapError, setMapError] = React.useState<string | null>(null);
   const [moveMode, setMoveMode] = React.useState<{ active: boolean; geometryId?: number }>({ active: false });
   const [popupContent, setPopupContent] = React.useState<{ 
@@ -229,23 +232,15 @@ const MapView: React.FC<MapViewProps> = ({
 
   // Geometrileri haritada göster
   useEffect(() => {
-    console.log("MapView - geometries useEffect çalıştı:", {
-      geometriesLength: geometries.length,
-      mapInitialized,
-      hasVectorSource: !!vectorSourceRef.current
-    });
-    
-    if (!vectorSourceRef.current || !mapInitialized) {
-      console.log("MapView - Koşullar sağlanmadı, çıkılıyor");
+    if (!vectorSourceRef.current) {
       return;
     }
     
     try {
-      vectorSourceRef.current.clear();
-      console.log("Vector source temizlendi");
-      
-      if (geometries.length > 0) {
-        console.log(`MapView - ${geometries.length} geometri işlenecek`);
+      vectorSourceRef.current!.clear();
+        
+        if (geometries.length > 0) {
+          console.log(`MapView - ${geometries.length} geometri işlenecek`);
         const wktFormat = new WKT();
         geometries.forEach((g, index) => {
           try {
@@ -270,34 +265,64 @@ const MapView: React.FC<MapViewProps> = ({
             // String olmayan WKT'yi string'e çevir
             if (typeof wktString !== 'string') {
               wktString = String(wktString);
-              console.log(`⚠️ WKT string'e çevrildi:`, wktString);
             }
             
             // SRID=xxxx; formatını kontrol et
             if (wktString.includes('SRID=')) {
               const sridMatch = wktString.match(/SRID=(\d+);/);
               if (sridMatch) {
-                projection = `EPSG:${sridMatch[1]}`;
-                wktString = wktString.replace(/SRID=\d+;/, '');
-                console.log(`🌍 SRID tespit edildi: ${projection}`);
+                const srid = parseInt(sridMatch[1]);
+                // Sadece geçerli SRID'leri kabul et
+                if ([4326, 3857, 32636, 32637, 32638, 32639, 32640, 32641, 32642, 32643, 32644, 32645, 32646, 32647, 32648, 32649, 32650, 32651, 32652, 32653, 32654, 32655, 32656, 32657, 32658, 32659, 32660].includes(srid)) {
+                  projection = `EPSG:${srid}`;
+                  wktString = wktString.replace(/SRID=\d+;/, '');
+                  console.log(`✅ Geçerli SRID bulundu: EPSG:${srid}`);
+                } else {
+                  console.warn(`⚠️ Geçersiz SRID: ${srid}, varsayılan EPSG:4326 kullanılıyor`);
+                  projection = 'EPSG:4326';
+                  wktString = wktString.replace(/SRID=\d+;/, '');
+                }
               }
-            } else {
-              console.log(`📍 SRID bulunamadı, varsayılan: ${projection}`);
             }
             
-            console.log(`📝 İşlenecek WKT:`, wktString.substring(0, 100) + "...");
+            let feature;
+            try {
+              feature = wktFormat.readFeature(wktString, { 
+                dataProjection: projection, 
+                featureProjection: 'EPSG:3857' 
+              });
+              
+              // Projection kontrolü
+              const geometry = feature.getGeometry();
+              if (geometry) {
+                const coords = (geometry as any).getCoordinates?.();
+                // Koordinatların geçerli olup olmadığını kontrol et
+                if (coords && Array.isArray(coords)) {
+                  const isValid = coords.every(coord => 
+                    Array.isArray(coord) && coord.every(c => typeof c === 'number' && isFinite(c))
+                  );
+                  if (!isValid) {
+                    console.warn(`⚠️ Geçersiz koordinatlar: ${JSON.stringify(coords)}`);
+                    return;
+                  }
+                }
+              }
+            } catch (err) {
+              console.error(`❌ WKT okuma hatası (${projection}):`, err);
+              // Fallback olarak EPSG:4326 dene
+              try {
+                feature = wktFormat.readFeature(wktString, { 
+                  dataProjection: 'EPSG:4326', 
+                  featureProjection: 'EPSG:3857' 
+                });
+                console.log(`✅ EPSG:4326 ile başarılı okuma`);
+              } catch (fallbackErr) {
+                console.error(`❌ Fallback okuma da başarısız:`, fallbackErr);
+                return;
+              }
+            }
             
-            const feature = wktFormat.readFeature(wktString, { 
-              dataProjection: projection, 
-              featureProjection: 'EPSG:3857' 
-            });
-            
-            console.log(`🔍 WKT okuma:`, {
-              wktString: wktString.substring(0, 100),
-              projection,
-              featureProjection: 'EPSG:3857',
-              geometryType: feature.getGeometry()?.getType()
-            });
+
             
             // Feature geometrisini kontrol et
             const geometry = feature.getGeometry();
@@ -315,12 +340,7 @@ const MapView: React.FC<MapViewProps> = ({
             } else if (geometry.getType() === 'Polygon') {
               coordinates = (geometry as any).getCoordinates();
             }
-            console.log(`🎯 Feature koordinatları (EPSG:3857):`, {
-              coordinates,
-              firstCoord: coordinates?.[0],
-              coordCount: coordinates?.length,
-              isInRange: coordinates?.[0]?.[0] > 1000000 && coordinates?.[0]?.[1] > 1000000
-            });
+
             
             // Feature'a bilgileri ekle
             if (g.id) {
@@ -350,28 +370,9 @@ const MapView: React.FC<MapViewProps> = ({
             const featureStyle = createFeatureStyle(feature, feature.get('type') || 'Point', isHighlighted);
             feature.setStyle(featureStyle);
             
-            // Feature'ı eklemeden önce extent kontrolü
-            const extent = geometry.getExtent();
-            console.log(`📦 Geometri extent:`, extent);
-            
-        vectorSourceRef.current!.addFeature(feature);
-            console.log(`📍 Pin stili uygulandı:`, {
-              type: feature.get('type'),
-              name: feature.get('name'),
-              hasStyle: !!feature.getStyle(),
-              isPoint: feature.get('type') === 'Point',
-              isHighlighted: isHighlighted,
-              iconSrc: feature.get('type') === 'Point' ? '/pin.png' : 'N/A',
-              iconScale: feature.get('type') === 'Point' ? '0.03 (ultra mini)' : 'N/A'
-            });
-            console.log(`✅ Geometri başarıyla eklendi:`, {
-              name: g.name || 'İsimsiz',
-              type: g.type,
-              projection,
-              geometryType: geometry.getType(),
-              coordinates: coordinates,
-              extent: extent
-            });
+            // Feature'ı ekle
+            vectorSourceRef.current!.addFeature(feature);
+
           } catch (err) {
             console.error('❌ Geometry format hatası:', {
               name: g.name,
@@ -382,30 +383,21 @@ const MapView: React.FC<MapViewProps> = ({
         });
         
         const totalFeatures = vectorSourceRef.current.getFeatures().length;
-        console.log(`🎯 Toplam ${totalFeatures} feature vector source'a eklendi`);
+        console.log(`📊 Haritada ${totalFeatures} geometri yüklendi`);
         
-        // Harita görünüm alanını kontrol et (Türkiye sınırları içinde tutmaya çalış)
+        // Harita görünüm alanını ayarla
         if (mapInstance.current && totalFeatures > 0) {
           const view = mapInstance.current.getView();
-          const currentCenter = view.getCenter();
-          const currentZoom = view.getZoom();
-          
-          console.log(`🗺️ Harita görünüm bilgileri:`, {
-            center: currentCenter,
-            zoom: currentZoom
-          });
-          
-          // Vector source'un extent'ini kontrol et
           const vectorExtent = vectorSourceRef.current.getExtent();
-          console.log(`📦 Vector source extent:`, vectorExtent);
           
           // Geometrilerin extent'ine zoom yap
           if (vectorExtent && vectorExtent.every(val => isFinite(val))) {
-            console.log(`🎯 Geometrilerin extent'ine zoom yapılıyor`);
             view.fit(vectorExtent, { 
               padding: [20, 20, 20, 20],
-              duration: 800
+              duration: 500, // Animasyon süresini kısalt
+              easing: (t: number) => t // Linear easing kullan
             });
+            console.log("📍 Geometrilerin extent'ine zoom yapıldı");
           }
         }
       } else {
@@ -414,30 +406,45 @@ const MapView: React.FC<MapViewProps> = ({
     } catch (err) {
       console.error('🔥 Geometri görüntüleme hatası:', err);
     }
-  }, [geometries, mapInitialized]);
+  }, [geometries]);
 
   // Belirli geometriye zoom yapma
   useEffect(() => {
-    console.log("🔄 zoomToGeometry useEffect çalıştı:", {
-      hasMapInstance: !!mapInstance.current,
-      hasZoomToGeometry: !!zoomToGeometry,
-      mapInitialized,
-      zoomToGeometry
-    });
-    
-    if (!mapInstance.current || !zoomToGeometry || !mapInitialized) {
-      console.log("❌ Zoom yapılamıyor - koşullar sağlanmadı");
+    if (!mapInstance.current || !zoomToGeometry) {
       return;
     }
     
-    console.log("🎯 Geometriye zoom yapılıyor:", zoomToGeometry);
-    
     try {
       const wktFormat = new WKT();
-      const feature = wktFormat.readFeature(zoomToGeometry.wkt, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857'
-      });
+      let feature;
+      
+      // SRID kontrolü
+      let wktString = zoomToGeometry.wkt;
+      let projection = 'EPSG:4326';
+      
+      if (wktString.includes('SRID=')) {
+        const sridMatch = wktString.match(/SRID=(\d+);/);
+        if (sridMatch) {
+          const srid = parseInt(sridMatch[1]);
+          if ([4326, 3857, 32636, 32637, 32638, 32639, 32640, 32641, 32642, 32643, 32644, 32645, 32646, 32647, 32648, 32649, 32650, 32651, 32652, 32653, 32654, 32655, 32656, 32657, 32658, 32659, 32660].includes(srid)) {
+            projection = `EPSG:${srid}`;
+            wktString = wktString.replace(/SRID=\d+;/, '');
+          }
+        }
+      }
+      
+      try {
+        feature = wktFormat.readFeature(wktString, {
+          dataProjection: projection,
+          featureProjection: 'EPSG:3857'
+        });
+      } catch (err) {
+        // Fallback olarak EPSG:4326 dene
+        feature = wktFormat.readFeature(wktString, {
+          dataProjection: 'EPSG:4326',
+          featureProjection: 'EPSG:3857'
+        });
+      }
       
       const geometry = feature.getGeometry();
       if (!geometry) {
@@ -453,17 +460,15 @@ const MapView: React.FC<MapViewProps> = ({
       // Geometri tipine göre zoom yap
       if (geometry.getType() === 'Point') {
         const coordinates = (geometry as any).getCoordinates();
-        view.animate({
-          center: coordinates,
-          zoom: 15,
-          duration: 1500
-        });
+        view.setCenter(coordinates);
+        view.setZoom(15);
         console.log(`📍 Nokta için zoom`);
       } else {
         // Diğer geometriler için fit kullan
         view.fit(extent, {
           padding: [20, 20, 20, 20],
-          duration: 1500
+          duration: 500, // Animasyon süresini kısalt
+          easing: (t: number) => t // Linear easing kullan
         });
         console.log(`📏 Çizgi/alan için fit zoom`);
       }
@@ -481,74 +486,125 @@ const MapView: React.FC<MapViewProps> = ({
     } catch (err) {
       console.error("❌ Zoom hatası:", err);
     }
-  }, [zoomToGeometry, mapInitialized]);
+  }, [zoomToGeometry]);
 
   // Harita başlatma
   useEffect(() => {
     if (mapRef.current && !mapInstance.current) {
       try {
-      vectorSourceRef.current = new VectorSource();
+        vectorSourceRef.current = new VectorSource();
         const vectorLayer = new VectorLayer({ 
           source: vectorSourceRef.current,
           style: (feature: any) => {
             const featureType = feature.get('type') || 'Point';
             const isHighlighted = feature.get('highlighted') || false;
             return createFeatureStyle(feature as Feature, featureType, isHighlighted);
-          }
+          },
+          renderBuffer: 50, // Render buffer'ı artır
+          updateWhileAnimating: true, // Animasyon sırasında güncellemeyi aç
+          updateWhileInteracting: true, // Etkileşim sırasında güncellemeyi aç
+          zIndex: 1
         });
         
         // Popup overlay oluştur
         if (popupRef.current) {
           popupOverlayRef.current = new Overlay({
-            element: popupRef.current,
-            autoPan: false, // Harita kaymasını engelle
-            offset: [0, -15], // Popup'u biraz yukarı kaydır
-            positioning: 'bottom-center' // Alt ortadan pozisyonla
+            element: popupRef.current
           });
         }
 
-      mapInstance.current = new Map({
-        target: mapRef.current,
+        mapInstance.current = new Map({
+          target: mapRef.current,
         layers: [
-          new TileLayer({ source: new OSM() }),
+          new TileLayer({ 
+            source: new OSM(),
+            zIndex: 0
+          }),
           vectorLayer,
         ],
         overlays: popupOverlayRef.current ? [popupOverlayRef.current] : [],
-        interactions: defaultInteractions(), // Tüm varsayılan etkileşimleri aktif et
-        view: new View({
-          center: [3924862.6, 4865942.2], // Türkiye'nin EPSG:3857'deki merkezi
-          zoom: 6,
-          projection: 'EPSG:3857',
-          enableRotation: false, // Döndürmeyi kapat
-          constrainResolution: false // Zoom kısıtlamasını kaldır
+        interactions: defaultInteractions({
+          doubleClickZoom: true,
+          dragPan: true,
+          mouseWheelZoom: true,
+          pinchZoom: true,
+          keyboard: true
         }),
+        view: new View({
+          center: transform([0, 0], 'EPSG:4326', 'EPSG:3857'), // Merkezi doğru projection'da ayarla
+          zoom: 2,
+          projection: 'EPSG:3857', // Açıkça projection belirt
+          enableRotation: false, // Rotasyonu kapat
+          constrainOnlyCenter: true, // Sadece merkezi sınırla
+          multiWorld: false // Çoklu dünya desteğini kapat
+        }),
+        pixelRatio: window.devicePixelRatio || 1 // Device pixel ratio kullan
       });
 
-        // Mouse hover event'leri ekle (daha stabil)
+        // Mouse hover event'leri ekle
         let currentFeature: any = null;
         
+        // Zoom event'lerini kaldır - titreşime neden oluyor
+        // mapInstance.current.getView().on('change:resolution', () => {
+        //   isZooming = true;
+        //   if (popupOverlayRef.current) {
+        //     popupOverlayRef.current.setPosition(undefined);
+        //     setPopupContent(null);
+        //   }
+        // });
+        
+        // mapInstance.current.getView().on('change:center', () => {
+        //   setTimeout(() => {
+        //     isZooming = false;
+        //   }, 1000);
+        // });
+        
+        // Mouse hover event'leri ekle - optimize edilmiş
+        let isZooming = false;
+        let hoverTimeout: number | null = null;
+        
+        // Zoom durumunu takip et
+        mapInstance.current.getView().on('change:resolution', () => {
+          isZooming = true;
+          // Zoom sırasında popup'ı gizle
+          if (popupOverlayRef.current) {
+            popupOverlayRef.current.setPosition(undefined);
+            setPopupContent(null);
+          }
+          // Zoom bittikten sonra popup'ı tekrar göster
+          setTimeout(() => {
+            isZooming = false;
+          }, 300);
+        });
+        
         mapInstance.current.on('pointermove', (evt) => {
-          const feature = mapInstance.current!.forEachFeatureAtPixel(evt.pixel, (feature) => feature);
-          
-          // Popup'ın üzerindeyse hiçbir şey yapma
-          if (popupRef.current && popupRef.current.contains(evt.originalEvent.target as Node)) {
+          // Zoom sırasında hover işlemini yapma
+          if (isZooming) {
             return;
           }
           
-          // Eğer aynı feature üzerindeyse hiçbir şey yapma
-          if (feature === currentFeature) {
-            return;
+          // Hover timeout'unu temizle
+          if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
           }
           
-          // Önceki timeout'u temizle
-          if (hoverTimeoutRef.current) {
-            clearTimeout(hoverTimeoutRef.current);
-          }
-          
-          currentFeature = feature;
-          
-          // Daha uzun gecikme ile hover işlemini yap
-          hoverTimeoutRef.current = setTimeout(() => {
+          // Hover işlemini geciktir
+          hoverTimeout = window.setTimeout(() => {
+            const feature = mapInstance.current!.forEachFeatureAtPixel(evt.pixel, (feature) => feature);
+            
+            // Popup'ın üzerindeyse hiçbir şey yapma
+            if (popupRef.current && popupRef.current.contains(evt.originalEvent.target as Node)) {
+              return;
+            }
+            
+            // Eğer aynı feature üzerindeyse hiçbir şey yapma
+            if (feature === currentFeature) {
+              return;
+            }
+            
+            currentFeature = feature;
+            
+            // Hover işlemini yap
             if (feature && popupOverlayRef.current) {
               const name = feature.get('name') || 'İsimsiz';
               const type = feature.get('type') || 'Bilinmeyen';
@@ -571,57 +627,26 @@ const MapView: React.FC<MapViewProps> = ({
               });
               
               popupOverlayRef.current.setPosition(coordinates);
-              console.log("📍 Popup gösteriliyor:", { 
-                name, 
-                type, 
-                id: feature.get('id'),
-                geometryDataId: geometryData?.id,
-                finalId: feature.get('id') || geometryData?.id
-              });
             } else if (popupOverlayRef.current) {
               popupOverlayRef.current.setPosition(undefined);
               setPopupContent(null);
             }
-          }, 300); // 300ms gecikme ile titreşimi tamamen önle
-        });
-
-        // Zoom değişikliklerini dinle
-        mapInstance.current.getView().on('change:resolution', () => {
-          const zoom = mapInstance.current!.getView().getZoom();
-          console.log("🔍 Zoom seviyesi değişti:", zoom);
+          }, 50); // 50ms gecikme
         });
 
         // Mouse wheel event'ini test et
         mapRef.current.addEventListener('wheel', (e) => {
-          console.log("🖱️ Mouse wheel event algılandı:", {
-            deltaY: e.deltaY,
-            ctrlKey: e.ctrlKey,
-            preventDefault: true
-          });
+          // Zoom sırasında gereksiz log'ları kaldır
         });
 
         // Harita yüklenme kontrolü
         mapInstance.current.on('rendercomplete', () => {
           setMapInitialized(true);
           setMapError(null);
-          
-
-          
-          // Interaction'ları kontrol et
-          const view = mapInstance.current!.getView();
-          const interactions = mapInstance.current!.getInteractions();
-          const interactionNames = interactions.getArray().map(i => i.constructor.name);
-          
-          console.log("🗺️ Harita başlatıldı - Zoom kontrolü aktif:", {
-            currentZoom: view.getZoom(),
-            minZoom: view.getMinZoom(),
-            maxZoom: view.getMaxZoom(),
-            interactions: interactionNames,
-            hasMouseWheelZoom: interactionNames.includes('MouseWheelZoom'),
-            hasDoubleClickZoom: interactionNames.includes('DoubleClickZoom'),
-            totalInteractions: interactions.getLength()
-          });
         });
+
+        // Harita hazır
+        setMapInitialized(true);
 
         // Tile yükleme hata kontrolü
         mapInstance.current.getLayers().forEach(layer => {
@@ -639,7 +664,7 @@ const MapView: React.FC<MapViewProps> = ({
     }
     
     return () => {
-      // Timeout'u temizle
+      // Timeout'ları temizle
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
       }
@@ -653,24 +678,21 @@ const MapView: React.FC<MapViewProps> = ({
 
   // Çizim interaction'ı
   useEffect(() => {
-    console.log(`🔧 Draw interaction kontrolü:`, {
-      hasMapInstance: !!mapInstance.current,
-      hasVectorSource: !!vectorSourceRef.current,
-      mapInitialized,
-      geometryType
-    });
-    
-    if (!mapInstance.current || !vectorSourceRef.current || !mapInitialized) {
-      console.log(`❌ Draw interaction eklenmedi - eksik bileşenler`);
+    if (!mapInstance.current || !vectorSourceRef.current) {
       return;
     }
     
+    console.log(`🎨 Çizim modu durumu: ${geometryType ? 'Aktif' : 'Pasif'}`);
+    
+    // Mevcut çizim interaction'ını kaldır
     if (drawRef.current) {
       mapInstance.current.removeInteraction(drawRef.current);
       drawRef.current = null;
+      console.log("🗑️ Çizim interaction'ı kaldırıldı");
     }
     
-    if (geometryType) {
+    // Sadece geometryType varsa ve boş string değilse çizim interaction'ı ekle
+    if (geometryType && geometryType.trim() !== "") {
       try {
       drawRef.current = new Draw({
         source: vectorSourceRef.current,
@@ -678,6 +700,7 @@ const MapView: React.FC<MapViewProps> = ({
           style: createFeatureStyle(new Feature(), geometryType)
       });
       mapInstance.current.addInteraction(drawRef.current);
+      console.log(`✅ Çizim interaction'ı eklendi: ${geometryType}`);
         
       drawRef.current.on('drawend', (evt) => {
           try {
@@ -695,13 +718,21 @@ const MapView: React.FC<MapViewProps> = ({
               featureProjection: 'EPSG:3857'
             });
             
+            // WKT'nin geçerli olup olmadığını kontrol et
+            if (!wkt || wkt.length < 10) {
+              console.error('❌ Geçersiz WKT oluşturuldu:', wkt);
+              return;
+            }
+            
             // WKT'yi doğrudan kullan
             const finalWkt = wkt;
             
             console.log(`🎨 Çizilen geometri WKT:`, {
               type: geometryType,
               originalWkt: wkt,
-              finalWkt: finalWkt
+              finalWkt: finalWkt,
+              wktLength: wkt.length,
+              isValid: wkt && wkt.length > 10
             });
             
             console.log(`🎨 Çizilen geometriye stil uygulandı:`, {
@@ -711,29 +742,12 @@ const MapView: React.FC<MapViewProps> = ({
               usingIcon: geometryType === 'Point' ? 'pin.png' : false
             });
             
-            // Çizilen feature'ı vector source'a ekle
-            if (vectorSourceRef.current) {
-              const beforeCount = vectorSourceRef.current.getFeatures().length;
-              vectorSourceRef.current.addFeature(feature);
-              const afterCount = vectorSourceRef.current.getFeatures().length;
-              
-              console.log(`✅ Feature vector source'a eklendi:`, {
-                type: geometryType,
-                beforeCount,
-                afterCount,
-                geometry: feature.getGeometry()?.getType(),
-                coordinates: (feature.getGeometry() as any)?.getCoordinates?.()
-              });
-              
-              // Tüm feature'ları listele
-              console.log(`📋 Vector source'daki tüm feature'lar:`, 
-                vectorSourceRef.current.getFeatures().map(f => ({
-                  type: f.get('type'),
-                  name: f.get('name'),
-                  geometry: f.getGeometry()?.getType()
-                }))
-              );
-            }
+            // Draw interaction'ı zaten feature'ı otomatik olarak ekliyor
+            console.log(`✅ Çizilen feature hazır:`, {
+              type: geometryType,
+              geometry: feature.getGeometry()?.getType(),
+              coordinates: (feature.getGeometry() as any)?.getCoordinates?.()
+            });
             
             // LineString çizimi tamamlandıysa sadece LineString'i gönder
             if (geometryType === 'LineString' && onDrawEnd) {
@@ -757,11 +771,29 @@ const MapView: React.FC<MapViewProps> = ({
         mapInstance.current.removeInteraction(drawRef.current);
       }
     };
-  }, [geometryType, onDrawEnd, mapInitialized]);
+  }, [geometryType, onDrawEnd]);
 
   return (
-    <div style={{ width: "100%", height: "100%", minHeight: 0, position: "relative" }}>
-      <div ref={mapRef} className="ol-map-container" style={{ width: "100%", height: "100%", minHeight: 0 }} />
+    <div style={{ 
+      width: "100%", 
+      height: "100%", 
+      minHeight: 0, 
+      position: "relative",
+      overflow: "hidden", // Overflow'u gizle
+      pointerEvents: !popupOpen ? "auto" : "none" // Popup açıkken mouse event'leri engelle
+    }}>
+      <div 
+        ref={mapRef} 
+        className="ol-map-container" 
+        style={{ 
+          width: "100%", 
+          height: "100%", 
+          minHeight: 0,
+          willChange: "transform", // GPU hızlandırma
+          backfaceVisibility: "hidden", // Backface'i gizle
+          pointerEvents: !popupOpen ? "auto" : "none" // Popup açıkken mouse event'leri engelle
+        }} 
+      />
       {mapError && (
         <div style={{
           position: "absolute",

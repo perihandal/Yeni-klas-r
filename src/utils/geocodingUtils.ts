@@ -141,12 +141,25 @@ export function extractCoordsFromWkt(wkt: string): { lat: number; lon: number } 
  * @returns Adres bilgisi
  */
 export async function getAddressFromWkt(wkt: string): Promise<GeocodingResult | null> {
-  const coords = extractCoordsFromWkt(wkt);
-  if (!coords) {
+  try {
+    console.log('🌍 WKT\'den adres alınıyor:', wkt);
+    console.log('🌍 WKT tipi:', typeof wkt);
+    console.log('🌍 WKT uzunluk:', wkt?.length);
+    
+    const coords = extractCoordsFromWkt(wkt);
+    console.log('🌍 Çıkarılan koordinatlar:', coords);
+    
+    if (!coords) {
+      console.warn('⚠️ WKT\'den koordinat çıkarılamadı:', wkt);
+      return null;
+    }
+    
+    return await getAddressFromCoords(coords.lat, coords.lon);
+    
+  } catch (error) {
+    console.error('❌ WKT geocoding hatası:', error);
     return null;
   }
-  
-  return await getAddressFromCoords(coords.lat, coords.lon);
 }
 
 /**
