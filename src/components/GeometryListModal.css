@@ -1,0 +1,532 @@
+/* GeometryListModal.css - Özel Modal Stilleri */
+
+.geometry-list-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.geometry-list-modal-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 900px;
+  max-height: 70vh;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.geometry-list-modal-header {
+  background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+  padding: 1rem 1.5rem;
+  color: white;
+  border-radius: 16px 16px 0 0;
+}
+
+.geometry-list-modal-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.geometry-list-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.geometry-list-modal-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 50%;
+  transition: all 0.2s;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.geometry-list-modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.geometry-list-modal-filters {
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.geometry-list-modal-filters-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.geometry-list-modal-search {
+  position: relative;
+  flex: 1;
+}
+
+.geometry-list-modal-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.geometry-list-modal-search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  background: white;
+}
+
+.geometry-list-modal-search-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.geometry-list-modal-filter-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.geometry-list-modal-type-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: white;
+  color: #374151;
+  transition: all 0.2s;
+  min-width: 120px;
+}
+
+.geometry-list-modal-type-select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.geometry-list-modal-refresh-btn {
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.geometry-list-modal-refresh-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.geometry-list-modal-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.geometry-list-modal-content {
+  flex: 1;
+  overflow: auto;
+  background: #f9fafb;
+  max-height: 400px;
+}
+
+.geometry-list-modal-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 256px;
+}
+
+.geometry-list-modal-loading-spinner {
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #1976d2;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.geometry-list-modal-loading-text {
+  margin-top: 1rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.geometry-list-modal-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 256px;
+  text-align: center;
+}
+
+.geometry-list-modal-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.geometry-list-modal-empty-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.geometry-list-modal-empty-subtitle {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.geometry-list-modal-grid {
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.75rem;
+}
+
+.geometry-list-modal-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.geometry-list-modal-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.geometry-list-modal-card-header {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  padding: 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.geometry-list-modal-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.geometry-list-modal-card-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.geometry-list-modal-card-icon-bg {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+}
+
+.geometry-list-modal-card-info h3 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.geometry-list-modal-card-type {
+  display: inline-flex;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  margin-top: 0.25rem;
+}
+
+.geometry-list-modal-card-type.point {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.geometry-list-modal-card-type.linestring {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.geometry-list-modal-card-type.polygon {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.geometry-list-modal-card-zoom {
+  padding: 0.25rem;
+  background: #dbeafe;
+  color: #2563eb;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.75rem;
+}
+
+.geometry-list-modal-card-zoom:hover {
+  background: #bfdbfe;
+  transform: scale(1.1);
+}
+
+.geometry-list-modal-card-body {
+  padding: 0.75rem;
+}
+
+.geometry-list-modal-card-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.geometry-list-modal-card-field:last-child {
+  margin-bottom: 0;
+}
+
+.geometry-list-modal-card-field-icon {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.geometry-list-modal-card-field-content {
+  flex: 1;
+}
+
+.geometry-list-modal-card-field-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 0.125rem;
+}
+
+.geometry-list-modal-card-field-value {
+  font-size: 0.875rem;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.geometry-list-modal-card-photo {
+  margin-top: 0.25rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.geometry-list-modal-card-photo-img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.geometry-list-modal-card-photo-img:hover {
+  transform: scale(1.05);
+}
+
+.geometry-list-modal-card-photo-placeholder {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.875rem;
+  border-radius: 8px;
+  border: 2px dashed #d1d5db;
+}
+
+.geometry-list-modal-card-actions {
+  padding: 0.5rem 0.75rem;
+  background: #f9fafb;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.geometry-list-modal-card-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.geometry-list-modal-card-btn {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.geometry-list-modal-card-btn.edit {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.geometry-list-modal-card-btn.edit:hover {
+  background: #fde68a;
+}
+
+.geometry-list-modal-card-btn.delete {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.geometry-list-modal-card-btn.delete:hover {
+  background: #fecaca;
+}
+
+.geometry-list-modal-card-status {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.geometry-list-modal-card-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.geometry-list-modal-card-status-text {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.geometry-list-modal-pagination {
+  background: white;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.geometry-list-modal-page-info {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.geometry-list-modal-page-buttons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.geometry-list-modal-page-btn {
+  padding: 0.25rem 0.5rem;
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.geometry-list-modal-page-btn:hover {
+  background: #e5e7eb;
+}
+
+.geometry-list-modal-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive Tasarım */
+@media (max-width: 768px) {
+  .geometry-list-modal-container {
+    max-width: 95vw;
+    max-height: 80vh;
+  }
+  
+  .geometry-list-modal-filters-content {
+    flex-direction: column;
+  }
+  
+  .geometry-list-modal-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .geometry-list-modal-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .geometry-list-modal-card-photo-img {
+    height: 100px;
+  }
+  
+  .geometry-list-modal-card-photo-placeholder {
+    height: 100px;
+  }
+  
+  .geometry-list-modal-card-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  
+  .geometry-list-modal-card-buttons {
+    justify-content: center;
+  }
+  
+  .geometry-list-modal-pagination {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
