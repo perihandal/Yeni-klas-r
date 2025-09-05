@@ -6,11 +6,9 @@ import { testGeocoding, getAddressFromWkt } from "./utils/geocodingUtils";
 import Sidebar from "./components/Sidebar";
 import GeometryTypeSelector from "./components/GeometryTypeSelector";
 import SearchBar from "./components/SearchBar";
-import MapView from "./components/MapView";
+import SimpleMap from "./components/SimpleMap";
 import PointFormModal from "./components/PointFormModal";
 import GeometryListModal from "./components/GeometryListModal";
-import ErrorBoundary from "./components/ErrorBoundary";
-// Test verileri kaldırıldı - gerçek veriler kullanılacak
 import "./App.css";
 
 const App: React.FC = () => {
@@ -22,6 +20,8 @@ const App: React.FC = () => {
   const [drawnWkt, setDrawnWkt] = useState("");
   const [popupType, setPopupType] = useState("Point");
   const [listModalOpen, setListModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [zoomToGeometry, setZoomToGeometry] = useState<{wkt: string, name: string} | null>(null);
 
 
   const [geometries, setGeometries] = useState<{
@@ -36,9 +36,7 @@ const App: React.FC = () => {
     photoBase64?: string;
     openingHours?: string;
   }[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [zoomToGeometry, setZoomToGeometry] = useState<{ wkt: string; name?: string } | null>(null);
 
   // Debug için state değişikliklerini takip et
   useEffect(() => {
@@ -47,7 +45,6 @@ const App: React.FC = () => {
 
   // Geometrileri çek
   useEffect(() => {
-    setLoading(true);
     console.log("Geometriler yükleniyor...");
     getAllGeometries()
       .then((res) => {
@@ -84,8 +81,7 @@ const App: React.FC = () => {
         setError(err.message);
         // Backend bağlantısı olmasa da harita çalışsın
         setGeometries([]);
-      })
-      .finally(() => setLoading(false));
+      });
   }, []);
 
   const handleAdd = () => {
@@ -100,7 +96,6 @@ const App: React.FC = () => {
   // Test fonksiyonu kaldırıldı - gerçek veriler kullanılacak
 
   const refreshGeometries = async () => {
-    setLoading(true);
     console.log("🔄 Geometriler yenileniyor...");
     try {
       const res = await getAllGeometries();
@@ -130,8 +125,6 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.warn("❌ Geometriler yüklenirken hata:", err.message);
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -160,22 +153,11 @@ const App: React.FC = () => {
     const firstResult = searchResults[0];
     console.log("📍 İlk sonuca odaklanılıyor:", firstResult);
     
-    // Zoom yapılacak geometriyi set et
-    setZoomToGeometry({
-      wkt: firstResult.wkt,
-      name: firstResult.name
-    });
-    
     // Arama sonuçlarını highlights için state'e set et
     setGeometries(prev => prev.map(g => ({
       ...g,
       highlighted: searchResults.some(result => result === g)
     })));
-    
-    // Kısa süre sonra zoom state'ini temizle
-    setTimeout(() => {
-      setZoomToGeometry(null);
-    }, 2000);
     
     alert(`${searchResults.length} sonuç bulundu: ${searchResults.map(r => r.name || 'İsimsiz').join(", ")}`);
   };
@@ -220,7 +202,7 @@ const App: React.FC = () => {
      }
    };
 
-   // Geometri güncelleme fonksiyonu
+   // Geometri güncelleme fonksiyonu - İlerde kullanılacak
    const handleUpdateGeometry = (geometry: any) => {
      console.log("✏️ Geometri güncelleniyor:", geometry);
      
@@ -236,7 +218,7 @@ const App: React.FC = () => {
    // Güncelleme işlemi için state
    const [editingGeometry, setEditingGeometry] = useState<any>(null);
 
-   // Geometri taşıma fonksiyonu
+   // Geometri taşıma fonksiyonu - İlerde kullanılacak
    const handleMoveGeometry = async (id: number, newWkt: string) => {
      console.log("🖐️ Geometri taşıma tamamlandı, ID:", id);
      console.log("🔄 Yeni WKT:", newWkt);
@@ -389,19 +371,28 @@ const App: React.FC = () => {
             </div>
           )}
 
-                      <ErrorBoundary>
-                        <MapView
-                          key={`map-${listModalOpen ? 'modal-open' : 'modal-closed'}`}
-                          geometryType={addMode && !popupOpen ? geometryType : ""}
-                          onDrawEnd={handleDrawEnd}
-                          geometries={geometries}
-                          zoomToGeometry={zoomToGeometry}
-                          onDeleteGeometry={handleDeleteGeometry}
-                          onUpdateGeometry={handleUpdateGeometry}
-                          onMoveGeometry={handleMoveGeometry}
-                          popupOpen={popupOpen}
-                        />
-                      </ErrorBoundary>
+          {/* Simple Map Test - Back to working version */}
+          <SimpleMap 
+            geometries={geometries}
+            geometryType={addMode && !popupOpen ? geometryType : ""}
+            onDrawEnd={handleDrawEnd}
+          />
+          
+          {/* Original Map - Temporarily disabled until fixed */}
+          {/* 
+          <ErrorBoundary>
+            <MapView
+              key={`map-${Date.now()}`}
+              geometryType={addMode && !popupOpen ? geometryType : ""}
+              onDrawEnd={handleDrawEnd}
+              geometries={geometries}
+              zoomToGeometry={zoomToGeometry}
+              onDeleteGeometry={handleDeleteGeometry}
+              onUpdateGeometry={handleUpdateGeometry}
+              onMoveGeometry={handleMoveGeometry}
+            />
+          </ErrorBoundary>
+          */}
         </div>
         <PointFormModal
           open={popupOpen}
