@@ -245,9 +245,9 @@ const App: React.FC = () => {
    // Güncelleme işlemi için state
    const [editingGeometry, setEditingGeometry] = useState<any>(null);
 
-   // Geometri taşıma fonksiyonu - İlerde kullanılacak
+   // Geometri taşıma fonksiyonu - Şekil olarak hareket eder
    const handleMoveGeometry = async (id: number, newWkt: string) => {
-     console.log("🖐️ Geometri taşıma tamamlandı, ID:", id);
+     console.log("🖐️ Geometri şekil taşıma tamamlandı, ID:", id);
      console.log("🔄 Yeni WKT:", newWkt);
      
      try {
@@ -310,7 +310,21 @@ const App: React.FC = () => {
        
        // Geometrileri yenile - yeni konumları al
        await refreshGeometries();
-       alert("Geometri başarıyla taşındı!");
+       
+       // Geometri tipine göre farklı mesaj göster
+       const geometryType = existingGeometry.type;
+       let successMessage = "";
+       if (geometryType === 'Point') {
+         successMessage = "📍 Nokta başarıyla yeni konuma taşındı!";
+       } else if (geometryType === 'LineString') {
+         successMessage = "📏 Çizgi başarıyla şekil olarak yeni konuma taşındı!";
+       } else if (geometryType === 'Polygon') {
+         successMessage = "🔷 Alan başarıyla şekil olarak yeni konuma taşındı!";
+       } else {
+         successMessage = "Geometri başarıyla taşındı!";
+       }
+       
+       alert(successMessage + " Adres bilgisi güncellendi.");
        
      } catch (error) {
        console.error("❌ Geometri güncelleme hatası:", error);

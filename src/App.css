@@ -11,6 +11,42 @@ html, body, #root {
   height: 100%;
   min-height: 0;
 }
+
+/* Drag işlemi sırasında cursor değişimi */
+.ol-viewport.dragging {
+  cursor: grabbing !important;
+}
+
+.ol-viewport .ol-selectable {
+  cursor: grab !important;
+}
+
+.ol-viewport .ol-selectable:hover {
+  cursor: grab !important;
+}
+
+/* Selected geometries için özel stil */
+.ol-viewport .ol-selected {
+  cursor: move !important;
+}
+
+/* Modify mode için crosshair cursor */
+.ol-viewport.modifying {
+  cursor: crosshair !important;
+}
+
+/* Pulse animasyonu */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
 .modal-overlay {
   position: fixed;
   top: 0;

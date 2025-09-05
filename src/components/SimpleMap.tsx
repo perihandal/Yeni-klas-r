@@ -9,7 +9,11 @@ import { Feature } from "ol";
 import { WKT } from "ol/format";
 import { Style, Fill, Stroke, Circle, Text, Icon } from "ol/style";
 import Draw from "ol/interaction/Draw";
+import Modify from "ol/interaction/Modify";
+import Translate from "ol/interaction/Translate";
+import Select from "ol/interaction/Select";
 import Overlay from "ol/Overlay";
+import { click } from "ol/events/condition";
 import "ol/ol.css";
 
 interface SimpleMapProps {
@@ -160,9 +164,13 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
   const mapInstance = useRef<Map | null>(null);
   const vectorSourceRef = useRef<VectorSource | null>(null);
   const drawInteractionRef = useRef<Draw | null>(null);
+  const selectInteractionRef = useRef<Select | null>(null);
+  const modifyInteractionRef = useRef<Modify | null>(null);
+  const translateInteractionRef = useRef<Translate | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
   const popupOverlayRef = useRef<Overlay | null>(null);
   const hoverTimeoutRef = useRef<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const [popupContent, setPopupContent] = useState<{ 
     id?: string | number;
@@ -223,6 +231,173 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
         }
         
         console.log('✅ Map created successfully!');
+        
+        // Select interaction for drag operations
+        const selectInteraction = new Select({
+          condition: click,
+          style: (feature) => {
+            // Seçili geometriler için özel stil
+            const geometryType = feature.get('type') || 'Point';
+            
+            if (geometryType === 'Point') {
+              return new Style({
+                image: new Icon({
+                  src: '/pin.png',
+                  scale: 0.04, // Biraz daha büyük
+                  anchor: [0.5, 1],
+                  anchorXUnits: 'fraction',
+                  anchorYUnits: 'fraction'
+                }),
+                text: new Text({
+                  text: feature.get('name') || '',
+                  offsetY: -15,
+                  fill: new Fill({ color: '#ff0000' }), // Kırmızı text
+                  stroke: new Stroke({ color: '#ffffff', width: 2 }),
+                  font: 'bold 12px Arial'
+                })
+              });
+            } else if (geometryType === 'LineString') {
+              return new Style({
+                stroke: new Stroke({
+                  color: '#ff0000', // Seçili çizgiler kırmızı
+                  width: 4
+                })
+              });
+            } else if (geometryType === 'Polygon') {
+              return new Style({
+                fill: new Fill({ 
+                  color: '#ff000060' // Seçili alanlar kırmızı transparan
+                }),
+                stroke: new Stroke({ 
+                  color: '#ff0000', // Seçili kenarlar kırmızı
+                  width: 3
+                })
+              });
+            }
+            
+            return []; // Boş array döndür
+          }
+        });
+        selectInteractionRef.current = selectInteraction;
+        mapInstance.current.addInteraction(selectInteraction);
+        
+        // Modify interaction for vertex editing (for detailed editing)
+        const modifyInteraction = new Modify({
+          features: selectInteraction.getFeatures()
+        });
+        modifyInteractionRef.current = modifyInteraction;
+        mapInstance.current.addInteraction(modifyInteraction);
+        
+        // Translate interaction for moving entire geometries
+        const translateInteraction = new Translate({
+          features: selectInteraction.getFeatures()
+        });
+        translateInteractionRef.current = translateInteraction;
+        mapInstance.current.addInteraction(translateInteraction);
+        
+        // Translate start event (şekil hareket etmeye başladı)
+        translateInteraction.on('translatestart', () => {
+          console.log('🖐️ Geometri taşıma başladı (Translate)');
+          setIsDragging(true);
+          
+          // Harita container'ına drag class'ı ekle
+          if (mapRef.current) {
+            mapRef.current.style.cursor = 'grabbing';
+          }
+          
+          // Popup'ı kapat
+          if (popupOverlayRef.current) {
+            popupOverlayRef.current.setPosition(undefined);
+            setPopupContent(null);
+          }
+        });
+        
+        // Translate end event - Şekil hareket etti, WKT güncelleme
+        translateInteraction.on('translateend', (evt) => {
+          console.log('✋ Geometri taşıma tamamlandı (Translate)');
+          setIsDragging(false);
+          
+          // Cursor'ı normal yap
+          if (mapRef.current) {
+            mapRef.current.style.cursor = '';
+          }
+          
+          const features = evt.features;
+          features.forEach((feature) => {
+            const id = feature.get('id');
+            const geometryType = feature.get('type');
+            
+            if (id && onMoveGeometry) {
+              // Yeni WKT'yi al
+              const wktFormat = new WKT();
+              const newWkt = wktFormat.writeFeature(feature, {
+                dataProjection: 'EPSG:4326',
+                featureProjection: 'EPSG:3857'
+              });
+              
+              console.log('� Geometri şekil olarak taşındı:', {
+                id: id,
+                name: feature.get('name'),
+                type: geometryType,
+                oldWkt: feature.get('wkt')?.substring(0, 50) + '...',
+                newWkt: newWkt.substring(0, 50) + '...'
+              });
+              
+              // WKT'yi feature'da güncelle
+              feature.set('wkt', newWkt);
+              
+              // Parent component'e bildir
+              onMoveGeometry(id as number, newWkt);
+            }
+          });
+        });
+        
+        // Modify events (vertex düzenleme için)
+        modifyInteraction.on('modifystart', () => {
+          console.log('✏️ Vertex düzenleme başladı');
+          setIsDragging(true);
+          
+          if (mapRef.current) {
+            mapRef.current.style.cursor = 'crosshair';
+          }
+          
+          if (popupOverlayRef.current) {
+            popupOverlayRef.current.setPosition(undefined);
+            setPopupContent(null);
+          }
+        });
+        
+        modifyInteraction.on('modifyend', (evt) => {
+          console.log('✅ Vertex düzenleme tamamlandı');
+          setIsDragging(false);
+          
+          if (mapRef.current) {
+            mapRef.current.style.cursor = '';
+          }
+          
+          const features = evt.features;
+          features.forEach((feature) => {
+            const id = feature.get('id');
+            if (id && onMoveGeometry) {
+              const wktFormat = new WKT();
+              const newWkt = wktFormat.writeFeature(feature, {
+                dataProjection: 'EPSG:4326',
+                featureProjection: 'EPSG:3857'
+              });
+              
+              console.log('🔄 Geometri vertex düzenlendi:', {
+                id: id,
+                name: feature.get('name'),
+                newWkt: newWkt.substring(0, 50) + '...'
+              });
+              
+              feature.set('wkt', newWkt);
+              onMoveGeometry(id as number, newWkt);
+            }
+          });
+        });
+        
+        console.log('✅ Drag interactions eklendi (Translate + Modify)');
         
         // Add geometries if any
         if (geometries.length > 0) {
@@ -307,10 +482,33 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
     }
     
     return () => {
+      // Timeout'ları temizle
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+      
+      // Interaction'ları temizle
       if (mapInstance.current) {
+        if (drawInteractionRef.current) {
+          mapInstance.current.removeInteraction(drawInteractionRef.current);
+          drawInteractionRef.current = null;
+        }
+        if (selectInteractionRef.current) {
+          mapInstance.current.removeInteraction(selectInteractionRef.current);
+          selectInteractionRef.current = null;
+        }
+        if (modifyInteractionRef.current) {
+          mapInstance.current.removeInteraction(modifyInteractionRef.current);
+          modifyInteractionRef.current = null;
+        }
+        if (translateInteractionRef.current) {
+          mapInstance.current.removeInteraction(translateInteractionRef.current);
+          translateInteractionRef.current = null;
+        }
+        
         mapInstance.current.setTarget(undefined);
         mapInstance.current = null;
-        console.log('🧹 Map cleaned up');
+        console.log('🧹 Map and all interactions cleaned up');
       }
     };
   }, [geometries]);
@@ -474,6 +672,32 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
 
   return (
     <div style={{ width: "100%", height: "100%", minHeight: "400px", position: "relative" }}>
+      {/* Drag Status Indicator */}
+      {isDragging && (
+        <div
+          style={{
+            position: "absolute",
+            top: "10px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(25, 118, 210, 0.9)",
+            color: "white",
+            padding: "8px 16px",
+            borderRadius: "20px",
+            fontSize: "14px",
+            fontWeight: "600",
+            zIndex: 1000,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
+        >
+          <span style={{ animation: "pulse 2s infinite" }}>🖐️</span>
+          Geometri şekil olarak hareket ediyor...
+        </div>
+      )}
+      
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
       
       {/* Popup Element - MapView'deki gibi */}
@@ -655,14 +879,39 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
               
               <button
                 onClick={() => {
-                  if (popupContent && popupContent.id) {
-                    alert("Taşıma modu: Geometriyi sürükleyerek taşıyın!");
-                    // Popup'ı kapat
-                    if (popupOverlayRef.current) {
-                      popupOverlayRef.current.setPosition(undefined);
-                      setPopupContent(null);
+                  if (popupContent && popupContent.id && selectInteractionRef.current) {
+                    // Feature'ı bul ve seç
+                    const features = vectorSourceRef.current?.getFeatures();
+                    const targetFeature = features?.find(f => f.get('id') === popupContent.id);
+                    
+                    if (targetFeature) {
+                      // Feature'ı seç - bu drag modunu aktif eder
+                      selectInteractionRef.current.getFeatures().clear();
+                      selectInteractionRef.current.getFeatures().push(targetFeature);
+                      
+                      const geometryType = targetFeature.get('type') || 'Point';
+                      let message = "";
+                      
+                      if (geometryType === 'Point') {
+                        message = "📍 Nokta seçildi! Sürükleyip bırakabilirsiniz.";
+                      } else if (geometryType === 'LineString') {
+                        message = "📏 Çizgi seçildi! Tüm çizgiyi şekil olarak sürükleyebilirsiniz. Vertex düzenlemek için köşelere tıklayın.";
+                      } else if (geometryType === 'Polygon') {
+                        message = "🔷 Alan seçildi! Tüm alanı şekil olarak sürükleyebilirsiniz. Vertex düzenlemek için köşelere tıklayın.";
+                      } else {
+                        message = "🖐️ Geometri seçildi! Şekil olarak sürükleyebilirsiniz.";
+                      }
+                      
+                      alert(message + " Taşıma işlemi otomatik olarak kaydedilecek.");
+                      
+                      // Popup'ı kapat
+                      if (popupOverlayRef.current) {
+                        popupOverlayRef.current.setPosition(undefined);
+                        setPopupContent(null);
+                      }
+                    } else {
+                      alert("Geometri bulunamadı!");
                     }
-                    // TODO: Taşıma modu implementasyonu
                   } else {
                     alert("Bu geometri için ID bulunamadı!");
                   }
