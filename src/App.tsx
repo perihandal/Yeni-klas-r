@@ -139,7 +139,9 @@ const App: React.FC = () => {
     // Geometriler içinde arama yap
     const searchResults = geometries.filter(geometry => 
       geometry.name?.toLowerCase().includes(search.toLowerCase()) ||
-      geometry.type?.toLowerCase().includes(search.toLowerCase())
+      geometry.type?.toLowerCase().includes(search.toLowerCase()) ||
+      geometry.fullAddress?.toLowerCase().includes(search.toLowerCase()) ||
+      geometry.description?.toLowerCase().includes(search.toLowerCase())
     );
     
     console.log("🎯 Arama sonuçları:", searchResults);
@@ -159,7 +161,32 @@ const App: React.FC = () => {
       highlighted: searchResults.some(result => result === g)
     })));
     
-    alert(`${searchResults.length} sonuç bulundu: ${searchResults.map(r => r.name || 'İsimsiz').join(", ")}`);
+    // İlk sonuca zoom yap
+    if (firstResult.wkt) {
+      setTimeout(() => {
+        setZoomToGeometry({ 
+          wkt: firstResult.wkt, 
+          name: firstResult.name || 'Arama Sonucu' 
+        });
+        
+        // 3 saniye sonra zoom state'ini temizle
+        setTimeout(() => {
+          setZoomToGeometry(null);
+          console.log('🧹 Arama zoom state temizlendi');
+        }, 3000);
+      }, 200);
+    }
+    
+    alert(`${searchResults.length} sonuç bulundu: ${searchResults.map(r => r.name || 'İsimsiz').join(", ")}. İlk sonuca zoom yapılıyor...`);
+    
+    // 10 saniye sonra highlight'ları temizle
+    setTimeout(() => {
+      setGeometries(prev => prev.map(g => ({
+        ...g,
+        highlighted: false
+      })));
+      console.log('🧹 Arama highlightlari temizlendi');
+    }, 10000);
   };
 
   // Çizim tamamlandığında popup aç
@@ -307,6 +334,12 @@ const App: React.FC = () => {
      // Modal kapandıktan sonra zoom işlemini yap
      setTimeout(() => {
        setZoomToGeometry({ wkt: geometry.wkt, name: geometry.name });
+       
+       // 3 saniye sonra zoom state'ini temizle
+       setTimeout(() => {
+         setZoomToGeometry(null);
+         console.log('🧹 Zoom state temizlendi');
+       }, 3000);
      }, 100);
    };
 
@@ -376,6 +409,10 @@ const App: React.FC = () => {
             geometries={geometries}
             geometryType={addMode && !popupOpen ? geometryType : ""}
             onDrawEnd={handleDrawEnd}
+            onDeleteGeometry={handleDeleteGeometry}
+            onUpdateGeometry={handleUpdateGeometry}
+            onMoveGeometry={handleMoveGeometry}
+            zoomToGeometry={zoomToGeometry}
           />
           
           {/* Original Map - Temporarily disabled until fixed */}

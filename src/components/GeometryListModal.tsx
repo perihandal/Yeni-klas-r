@@ -37,6 +37,7 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Geometrileri yükle
   const loadGeometries = async (page: number = 1) => {
@@ -69,8 +70,12 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
       
       setGeometries(response.data || []);
       setFilteredGeometries(response.data || []);
-      // API'den gelen totalPages bilgisini kullan
-      setTotalPages(response.totalPages || Math.ceil((response.totalCount || 0) / pageSize));
+      // API'den gelen totalPages ve totalCount bilgisini kullan
+      const totalCount = response.totalCount || 0;
+      const totalPages = response.totalPages || Math.ceil(totalCount / pageSize);
+      
+      setTotalCount(totalCount);
+      setTotalPages(totalPages);
       
       console.log(`📊 Sayfa ${page} yüklendi: ${response.data?.length || 0} geometri`);
       console.log(`📊 Toplam sayfa: ${response.totalPages}, Toplam kayıt: ${response.totalCount}`);
@@ -91,8 +96,19 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
 
   // Filtreleme ve arama - Server-side pagination için yeniden yükle
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && (searchTerm !== '' || selectedType !== 'all')) {
       // Filtreleme değiştiğinde sayfa 1'e dön ve yeniden yükle
+      setCurrentPage(1);
+      
+      // Debounce search to avoid too many API calls
+      const timer = setTimeout(() => {
+        console.log('🔍 Filtreleme yapılıyor:', { searchTerm, selectedType });
+        loadGeometries(1);
+      }, 500); // 500ms delay
+      
+      return () => clearTimeout(timer);
+    } else if (isOpen && searchTerm === '' && selectedType === 'all') {
+      // Filtreler temizlendiğinde hemen yükle
       setCurrentPage(1);
       loadGeometries(1);
     }
@@ -168,30 +184,73 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="geometry-list-modal-search-input"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="geometry-list-modal-search-clear"
+                  title="Aramayı temizle"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
-            {/* Tip Filtresi */}
+            {/* Tip Filtresi ve Kontroller */}
             <div className="geometry-list-modal-filter-row">
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="geometry-list-modal-type-select"
               >
-                <option value="all">🎯 Tüm</option>
-                <option value="Point">📍 Point</option>
-                <option value="LineString">📏 Line</option>
-                <option value="Polygon">🔷 Polygon</option>
+                <option value="all">🎯 Tümü ({totalCount || 0})</option>
+                <option value="Point">📍 Noktalar</option>
+                <option value="LineString">📏 Çizgiler</option>
+                <option value="Polygon">🔷 Alanlar</option>
               </select>
+
+              {/* Filtreleri Temizle */}
+              {(searchTerm || selectedType !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedType('all');
+                  }}
+                  className="geometry-list-modal-clear-filters-btn"
+                  title="Tüm filtreleri temizle"
+                >
+                  🧹 Temizle
+                </button>
+              )}
 
               {/* Yenile Butonu */}
               <button
                 onClick={() => loadGeometries(currentPage)}
                 disabled={loading}
                 className="geometry-list-modal-refresh-btn"
+                title="Listeyi yenile"
               >
                 {loading ? '🔄' : '🔄'}
               </button>
             </div>
+
+            {/* Aktif Filtreler */}
+            {(searchTerm || selectedType !== 'all') && (
+              <div className="geometry-list-modal-active-filters">
+                <span className="geometry-list-modal-active-filters-label">Aktif filtreler:</span>
+                {searchTerm && (
+                  <span className="geometry-list-modal-filter-tag">
+                    🔍 "{searchTerm}"
+                    <button onClick={() => setSearchTerm('')}>✕</button>
+                  </span>
+                )}
+                {selectedType !== 'all' && (
+                  <span className="geometry-list-modal-filter-tag">
+                    {selectedType === 'Point' ? '📍' : selectedType === 'LineString' ? '📏' : '🔷'} {selectedType}
+                    <button onClick={() => setSelectedType('all')}>✕</button>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

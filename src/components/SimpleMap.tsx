@@ -27,6 +27,10 @@ interface SimpleMapProps {
   }>;
   geometryType?: string;
   onDrawEnd?: (wkt: string) => void;
+  onDeleteGeometry?: (id: number) => void;
+  onUpdateGeometry?: (geometry: any) => void;
+  onMoveGeometry?: (id: number, newWkt: string) => void;
+  zoomToGeometry?: { wkt: string, name: string } | null;
 }
 
 // Pin/marker stillerini oluştur - basit cache ile optimize edildi
@@ -143,7 +147,15 @@ const formatValue = (value: string | object | undefined): string => {
   return String(value);
 };
 
-const SimpleMap: React.FC<SimpleMapProps> = ({ geometries = [], geometryType = "", onDrawEnd }) => {
+const SimpleMap: React.FC<SimpleMapProps> = ({ 
+  geometries = [], 
+  geometryType = "", 
+  onDrawEnd,
+  onDeleteGeometry,
+  onUpdateGeometry,
+  onMoveGeometry,
+  zoomToGeometry
+}) => {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstance = useRef<Map | null>(null);
   const vectorSourceRef = useRef<VectorSource | null>(null);
@@ -227,8 +239,9 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ geometries = [], geometryType = "
               feature.set('type', geometry.type || 'Point');
               feature.set('id', geometry.id);
               feature.set('wkt', geometry.wkt); // WKT'yi de kaydet
+              feature.set('highlighted', (geometry as any).highlighted || false); // Highlighted özelliğini ekle
               vectorSource.addFeature(feature);
-              console.log(`✅ Added geometry ${index + 1}: ${geometry.name || 'No name'} (${geometry.type})`);
+              console.log(`✅ Added geometry ${index + 1}: ${geometry.name || 'No name'} (${geometry.type}) - Highlighted: ${(geometry as any).highlighted || false}`);
             } catch (error) {
               console.warn(`❌ Error adding geometry ${index + 1}:`, error);
             }
@@ -362,6 +375,103 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ geometries = [], geometryType = "
     };
   }, [geometryType, onDrawEnd]);
 
+  // Zoom to geometry useEffect
+  useEffect(() => {
+    if (!mapInstance.current || !zoomToGeometry) {
+      return;
+    }
+    
+    console.log('🎯 Zoom işlemi başlatılıyor:', zoomToGeometry);
+    
+    try {
+      const wktFormat = new WKT();
+      const feature = wktFormat.readFeature(zoomToGeometry.wkt, {
+        dataProjection: 'EPSG:4326',
+        featureProjection: 'EPSG:3857'
+      });
+      
+      const geometry = feature.getGeometry();
+      if (!geometry) {
+        console.error("❌ Zoom için geometri oluşturulamadı");
+        return;
+      }
+      
+      const extent = geometry.getExtent();
+      const view = mapInstance.current.getView();
+      
+      console.log('🎯 Geometri tipi:', geometry.getType());
+      console.log('🎯 Extent:', extent);
+      
+      // Nokta geometrisi için özel zoom
+      if (geometry.getType() === 'Point') {
+        const coordinates = (geometry as any).getCoordinates();
+        console.log('📍 Point koordinatları:', coordinates);
+        view.animate({
+          center: coordinates,
+          zoom: 18,
+          duration: 1500
+        });
+      } else {
+        // Diğer geometriler için fit kullan
+        console.log('🔷 Polygon/LineString extent fit yapılıyor');
+        view.fit(extent, {
+          padding: [50, 50, 50, 50],
+          maxZoom: 18,
+          duration: 1500
+        });
+      }
+      
+      console.log('✅ Zoom işlemi tamamlandı');
+      
+      // Zoom işlemi tamamlandıktan sonra state'i temizle
+      setTimeout(() => {
+        // Zoom prop'unu sıfırlamak için parent component'e bildirim gönderilebilir
+        // Şimdilik sadece log atalım
+        console.log('🧹 Zoom state temizlenmeye hazır');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('❌ Zoom işlemi sırasında hata:', error);
+    }
+  }, [zoomToGeometry]);
+
+  // Geometriler değiştiğinde haritayı güncelle (arama sonuçları için)
+  useEffect(() => {
+    if (!mapInstance.current || !vectorSourceRef.current) return;
+
+    console.log('🔄 Geometriler güncellendiği için haritayı yeniliyoruz...');
+    
+    // Mevcut feature'ları temizle
+    vectorSourceRef.current.clear();
+    
+    // Yeni geometrileri ekle
+    if (geometries.length > 0) {
+      const wktFormat = new WKT();
+      
+      geometries.forEach((geometry, index) => {
+        try {
+          const feature = wktFormat.readFeature(geometry.wkt, {
+            dataProjection: 'EPSG:4326',
+            featureProjection: 'EPSG:3857'
+          });
+          feature.set('name', geometry.name || `Geometry ${index + 1}`);
+          feature.set('type', geometry.type || 'Point');
+          feature.set('id', geometry.id);
+          feature.set('wkt', geometry.wkt);
+          feature.set('highlighted', (geometry as any).highlighted || false);
+          vectorSourceRef.current!.addFeature(feature);
+          
+          // Highlighted geometriyi logla
+          if ((geometry as any).highlighted) {
+            console.log(`🔍 Highlighted geometry: ${geometry.name} (${geometry.type})`);
+          }
+        } catch (error) {
+          console.warn(`❌ Error updating geometry ${index + 1}:`, error);
+        }
+      });
+    }
+  }, [geometries]);
+
   return (
     <div style={{ width: "100%", height: "100%", minHeight: "400px", position: "relative" }}>
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
@@ -459,6 +569,125 @@ const SimpleMap: React.FC<SimpleMapProps> = ({ geometries = [], geometryType = "
                 <strong>🏁 Bitiş:</strong> {formatValue(popupContent.endPoint)}
               </div>
             )}
+            
+            {/* Butonlar */}
+            <div style={{
+              display: "flex",
+              gap: "4px",
+              justifyContent: "space-between",
+              marginTop: "8px"
+            }}>
+              <button
+                onClick={() => {
+                  if (onDeleteGeometry && popupContent && popupContent.id) {
+                    console.log("🗑️ Silme işlemi başlatılıyor, ID:", popupContent.id);
+                    onDeleteGeometry(popupContent.id as number);
+                    // Popup'ı kapat
+                    if (popupOverlayRef.current) {
+                      popupOverlayRef.current.setPosition(undefined);
+                      setPopupContent(null);
+                    }
+                  } else {
+                    alert("Bu geometri için ID bulunamadı!");
+                  }
+                }}
+                style={{
+                  padding: "3px 6px",
+                  backgroundColor: "#dc3545",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "3px",
+                  cursor: "pointer",
+                  fontSize: "9px",
+                  fontWeight: "600",
+                  transition: "background-color 0.2s"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#c82333";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#dc3545";
+                }}
+              >
+                🗑️ Sil
+              </button>
+              
+              <button
+                onClick={() => {
+                  if (onUpdateGeometry && popupContent) {
+                    // Geometri bilgilerini bul
+                    const geometry = popupContent.id 
+                      ? geometries.find(g => g.id === popupContent.id)
+                      : geometries.find(g => g.name === popupContent.name && g.type === popupContent.type);
+                    
+                    if (geometry) {
+                      onUpdateGeometry(geometry);
+                    } else {
+                      alert("Geometri bulunamadı!");
+                    }
+                    // Popup'ı kapat
+                    if (popupOverlayRef.current) {
+                      popupOverlayRef.current.setPosition(undefined);
+                      setPopupContent(null);
+                    }
+                  }
+                }}
+                style={{
+                  padding: "3px 6px",
+                  backgroundColor: "#28a745",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "3px",
+                  cursor: "pointer",
+                  fontSize: "9px",
+                  fontWeight: "600",
+                  transition: "background-color 0.2s"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#218838";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#28a745";
+                }}
+              >
+                ✏️ Güncelle
+              </button>
+              
+              <button
+                onClick={() => {
+                  if (popupContent && popupContent.id) {
+                    alert("Taşıma modu: Geometriyi sürükleyerek taşıyın!");
+                    // Popup'ı kapat
+                    if (popupOverlayRef.current) {
+                      popupOverlayRef.current.setPosition(undefined);
+                      setPopupContent(null);
+                    }
+                    // TODO: Taşıma modu implementasyonu
+                  } else {
+                    alert("Bu geometri için ID bulunamadı!");
+                  }
+                }}
+                style={{
+                  padding: "3px 6px",
+                  backgroundColor: "#007bff",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "3px",
+                  cursor: "pointer",
+                  fontSize: "9px",
+                  fontWeight: "600",
+                  transition: "background-color 0.2s"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#0056b3";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#007bff";
+                }}
+              >
+                🖐️ Taşı
+              </button>
+            </div>
           </>
         )}
       </div>
