@@ -14,6 +14,7 @@ import Translate from "ol/interaction/Translate";
 import Select from "ol/interaction/Select";
 import Overlay from "ol/Overlay";
 import { click } from "ol/events/condition";
+import { toast } from 'react-toastify';
 import "ol/ol.css";
 
 interface SimpleMapProps {
@@ -812,7 +813,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
                       setPopupContent(null);
                     }
                   } else {
-                    alert("Bu geometri için ID bulunamadı!");
+                    toast.error("❌ Bu geometri için ID bulunamadı!");
                   }
                 }}
                 style={{
@@ -847,7 +848,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
                     if (geometry) {
                       onUpdateGeometry(geometry);
                     } else {
-                      alert("Geometri bulunamadı!");
+                      toast.error("❌ Geometri bulunamadı!");
                     }
                     // Popup'ı kapat
                     if (popupOverlayRef.current) {
@@ -902,7 +903,7 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
                         message = "🖐️ Geometri seçildi! Şekil olarak sürükleyebilirsiniz.";
                       }
                       
-                      alert(message + " Taşıma işlemi otomatik olarak kaydedilecek.");
+                      toast.info(message + " Taşıma işlemi otomatik olarak kaydedilecek.");
                       
                       // Popup'ı kapat
                       if (popupOverlayRef.current) {
@@ -910,10 +911,10 @@ const SimpleMap: React.FC<SimpleMapProps> = ({
                         setPopupContent(null);
                       }
                     } else {
-                      alert("Geometri bulunamadı!");
+                      toast.error("❌ Geometri bulunamadı!");
                     }
                   } else {
-                    alert("Bu geometri için ID bulunamadı!");
+                    toast.error("❌ Bu geometri için ID bulunamadı!");
                   }
                 }}
                 style={{

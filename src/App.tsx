@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { getAllGeometries, addGeometry, deleteGeometry, updateGeometry } from "./api";
 import { testGeocoding, getAddressFromWkt } from "./utils/geocodingUtils";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 import Sidebar from "./components/Sidebar";
 import GeometryTypeSelector from "./components/GeometryTypeSelector";
@@ -20,7 +22,6 @@ const App: React.FC = () => {
   const [drawnWkt, setDrawnWkt] = useState("");
   const [popupType, setPopupType] = useState("Point");
   const [listModalOpen, setListModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [zoomToGeometry, setZoomToGeometry] = useState<{wkt: string, name: string} | null>(null);
 
 
@@ -130,7 +131,7 @@ const App: React.FC = () => {
 
   const handleSearch = () => {
     if (!search.trim()) {
-      alert("Lütfen arama yapılacak bir metin girin!");
+      toast.warning("Lütfen arama yapılacak bir metin girin!");
       return;
     }
     
@@ -147,7 +148,7 @@ const App: React.FC = () => {
     console.log("🎯 Arama sonuçları:", searchResults);
     
     if (searchResults.length === 0) {
-      alert(`"${search}" için sonuç bulunamadı!`);
+      toast.error(`"${search}" için sonuç bulunamadı!`);
       return;
     }
     
@@ -177,7 +178,7 @@ const App: React.FC = () => {
       }, 200);
     }
     
-    alert(`${searchResults.length} sonuç bulundu: ${searchResults.map(r => r.name || 'İsimsiz').join(", ")}. İlk sonuca zoom yapılıyor...`);
+    toast.success(`🎯 ${searchResults.length} sonuç bulundu: ${searchResults.map(r => r.name || 'İsimsiz').join(", ")}. İlk sonuca zoom yapılıyor...`);
     
     // 10 saniye sonra highlight'ları temizle
     setTimeout(() => {
@@ -205,6 +206,8 @@ const App: React.FC = () => {
      
      try {
        console.log("🗑️ Geometri siliniyor, ID:", id);
+       toast.info("🗑️ Geometri siliniyor...");
+       
        await deleteGeometry(id);
        
        // Frontend'den kaldır
@@ -215,7 +218,7 @@ const App: React.FC = () => {
        });
        console.log("✅ Geometri başarıyla silindi");
        
-       alert("Geometri başarıyla silindi!");
+       toast.success("✅ Geometri başarıyla silindi!");
        
        // 2 saniye sonra backend'den yenile (silme işleminin tamamlanması için)
        setTimeout(async () => {
@@ -225,7 +228,7 @@ const App: React.FC = () => {
        
      } catch (error) {
        console.error("❌ Geometri silinirken hata:", error);
-       alert("Geometri silinirken bir hata oluştu!");
+       toast.error("❌ Geometri silinirken bir hata oluştu!");
      }
    };
 
@@ -324,11 +327,11 @@ const App: React.FC = () => {
          successMessage = "Geometri başarıyla taşındı!";
        }
        
-       alert(successMessage + " Adres bilgisi güncellendi.");
+       toast.success(successMessage + " Adres bilgisi güncellendi.");
        
      } catch (error) {
        console.error("❌ Geometri güncelleme hatası:", error);
-       alert("Geometri güncellenirken hata oluştu!");
+       toast.error("❌ Geometri güncellenirken hata oluştu!");
      }
    };
 
@@ -456,7 +459,6 @@ const App: React.FC = () => {
             setAddMode(false); // Modal kapandığında çizim modunu kapat
           }}
           onSave={async (data) => {
-            setLoading(true);
             try {
               if (editingGeometry) {
                 // Güncelleme işlemi
@@ -501,8 +503,6 @@ const App: React.FC = () => {
               console.log('✅ Geometri işlemi tamamlandı ve liste güncellendi');
             } catch (err: any) {
               setError(err.message);
-            } finally {
-              setLoading(false);
             }
           }}
         />
@@ -516,6 +516,20 @@ const App: React.FC = () => {
           onDelete={handleListDelete}
         />
       </main>
+      
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </div>
   );
 };

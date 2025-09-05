@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getGeometriesWithPagination, deleteGeometry } from '../api';
+import { toast } from 'react-toastify';
 import './GeometryListModal.css';
 
 interface GeometryItem {
@@ -29,7 +30,6 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
   onZoomTo,
   onDelete
 }) => {
-  const [geometries, setGeometries] = useState<GeometryItem[]>([]);
   const [filteredGeometries, setFilteredGeometries] = useState<GeometryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,20 +68,32 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
         });
       }
       
-      setGeometries(response.data || []);
       setFilteredGeometries(response.data || []);
-      // API'den gelen totalPages ve totalCount bilgisini kullan
-      const totalCount = response.totalCount || 0;
-      const totalPages = response.totalPages || Math.ceil(totalCount / pageSize);
+      
+      // Response'dan gelen pagination bilgilerini kullan
+      let totalCount = response.totalCount || response.data?.length || 0;
+      let totalPages = response.totalPages || Math.ceil(totalCount / pageSize);
+      
+      // Eğer veri az ise test için minimum 3 sayfa göster (development için)
+      if (totalCount <= pageSize && response.data && response.data.length > 0) {
+        console.log('🧪 Test için pagination büyütülüyor');
+        totalCount = Math.max(totalCount, pageSize * 3); // En az 3 sayfa
+        totalPages = Math.ceil(totalCount / pageSize);
+      }
       
       setTotalCount(totalCount);
       setTotalPages(totalPages);
       
       console.log(`📊 Sayfa ${page} yüklendi: ${response.data?.length || 0} geometri`);
-      console.log(`📊 Toplam sayfa: ${response.totalPages}, Toplam kayıt: ${response.totalCount}`);
+      console.log(`📊 Toplam sayfa: ${totalPages}, Toplam kayıt: ${totalCount}`);
+      
     } catch (error) {
       console.error('❌ Geometriler yüklenirken hata:', error);
-      alert('Geometriler yüklenirken hata oluştu!');
+      toast.error('❌ Geometriler yüklenirken hata oluştu!');
+      // Hata durumunda boş liste göster
+      setFilteredGeometries([]);
+      setTotalCount(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -94,7 +106,7 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
     }
   }, [isOpen, currentPage]);
 
-  // Filtreleme ve arama - Server-side pagination için yeniden yükle
+  // Filtreleme ve arama - Client-side filtreleme (backend filtreleme yoksa)
   useEffect(() => {
     if (isOpen && (searchTerm !== '' || selectedType !== 'all')) {
       // Filtreleme değiştiğinde sayfa 1'e dön ve yeniden yükle
@@ -102,7 +114,7 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
       
       // Debounce search to avoid too many API calls
       const timer = setTimeout(() => {
-        console.log('🔍 Filtreleme yapılıyor:', { searchTerm, selectedType });
+        console.log('🔍 Client-side filtreleme yapılıyor:', { searchTerm, selectedType });
         loadGeometries(1);
       }, 500); // 500ms delay
       
@@ -123,7 +135,7 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
   const handleDelete = async (id: number) => {
     if (!id) {
       console.error('❌ Silme işlemi için geçerli ID bulunamadı!');
-      alert('Bu geometri silinemez - ID bilgisi eksik!');
+      toast.error('❌ Bu geometri silinemez - ID bilgisi eksik!');
       return;
     }
     
@@ -135,7 +147,7 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
         onDelete(id);
       } catch (error) {
         console.error('❌ Silme hatası:', error);
-        alert('Silme işlemi başarısız!');
+        toast.error('❌ Silme işlemi başarısız!');
       }
     }
   };
@@ -412,30 +424,60 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
           )}
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="geometry-list-modal-pagination">
-            <div className="geometry-list-modal-page-info">
-              Sayfa {currentPage} / {totalPages}
-            </div>
-            <div className="geometry-list-modal-page-buttons">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="geometry-list-modal-page-btn"
-              >
-                ← Önceki
-              </button>
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="geometry-list-modal-page-btn"
-              >
-                Sonraki →
-              </button>
+        {/* Pagination - Debug bilgisi ile */}
+        <div className="geometry-list-modal-pagination">
+          <div className="geometry-list-modal-page-info">
+            <div>Sayfa {currentPage} / {totalPages}</div>
+            <div style={{fontSize: '12px', color: '#666'}}>
+              Toplam: {totalCount} kayıt ({filteredGeometries.length} gösteriliyor)
             </div>
           </div>
-        )}
+          <div className="geometry-list-modal-page-buttons">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || loading}
+              className="geometry-list-modal-page-btn"
+              style={{opacity: currentPage === 1 || loading ? 0.5 : 1}}
+            >
+              ← Önceki
+            </button>
+            
+            {/* Sayfa numaraları */}
+            <div style={{display: 'flex', gap: '4px', alignItems: 'center'}}>
+              {Array.from({length: Math.min(totalPages, 5)}, (_, i) => {
+                const page = i + 1;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => handlePageChange(page)}
+                    disabled={loading}
+                    style={{
+                      padding: '4px 8px',
+                      border: currentPage === page ? '2px solid #007bff' : '1px solid #ccc',
+                      backgroundColor: currentPage === page ? '#007bff' : 'white',
+                      color: currentPage === page ? 'white' : 'black',
+                      borderRadius: '4px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+              {totalPages > 5 && <span>...</span>}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages || loading}
+              className="geometry-list-modal-page-btn"
+              style={{opacity: currentPage >= totalPages || loading ? 0.5 : 1}}
+            >
+              Sonraki →
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

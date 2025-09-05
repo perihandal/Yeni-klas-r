@@ -197,16 +197,8 @@ export async function getGeometriesWithPagination(page: number = 1, pageSize: nu
     console.log("🌐 Server-side Pagination API isteği gönderiliyor");
     console.log("📄 Sayfa:", page, "Sayfa boyutu:", pageSize);
     
-    // Backend'deki pagination endpoint'ini kullan
-    let url = `${API_BASE}?page=${page}&pageSize=${pageSize}`;
-    
-    // Filtreleme parametrelerini ekle
-    if (searchTerm && searchTerm.trim()) {
-      url += `&search=${encodeURIComponent(searchTerm.trim())}`;
-    }
-    if (selectedType && selectedType !== 'all') {
-      url += `&type=${encodeURIComponent(selectedType)}`;
-    }
+    // Backend'inizin URL formatına uygun endpoint
+    let url = `${API_BASE}/${page}/${pageSize}`;
     
     console.log("🌐 Pagination URL:", url);
     
@@ -220,40 +212,55 @@ export async function getGeometriesWithPagination(page: number = 1, pageSize: nu
     const data = await res.json();
     console.log("📋 Ham API verisi:", data);
     
-    // Backend'den gelen veri formatını normalize et
-    let geometries = data;
+    // Backend'den gelen Response<List<GeometryDto>> formatını işle
+    let geometries = [];
     let totalCount = 0;
     let totalPages = 1;
     
-    // Eğer data.data varsa onu kullan (backend pagination response formatı)
-    if (data.data && Array.isArray(data.data)) {
+    // Backend Response formatı kontrol et
+    if (data.success && data.data && Array.isArray(data.data)) {
       geometries = data.data;
-      totalCount = data.totalCount || data.total || geometries.length;
-      totalPages = data.totalPages || Math.ceil(totalCount / pageSize);
+      totalCount = data.data.length; // Backend'den total bilgisi gelmiyorsa sadece mevcut sayfa
+      totalPages = Math.ceil(totalCount / pageSize);
     }
-    // Eğer data kendisi array ise (fallback)
+    // Direkt data array'i gelirse
     else if (Array.isArray(data)) {
       geometries = data;
       totalCount = data.length;
       totalPages = Math.ceil(totalCount / pageSize);
     }
-    // Eğer tek bir object ise array'e çevir
+    // Tek object gelirse
     else if (data && typeof data === 'object') {
       geometries = [data];
       totalCount = 1;
       totalPages = 1;
     }
     
-    console.log("🔄 Backend'den gelen toplam sayı:", totalCount);
-    console.log("📄 Backend'den gelen toplam sayfa:", totalPages);
-    console.log("📋 Bu sayfa için geometri sayısı:", geometries.length);
+    // Client-side filtreleme (backend filtreleme yoksa)
+    if (searchTerm && searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      geometries = geometries.filter((geometry: any) => 
+        (geometry.name && geometry.name.toLowerCase().includes(searchLower)) ||
+        (geometry.fullAddress && geometry.fullAddress.toLowerCase().includes(searchLower)) ||
+        (geometry.description && geometry.description.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    if (selectedType && selectedType !== 'all') {
+      geometries = geometries.filter((geometry: any) => 
+        geometry.type && geometry.type.toLowerCase() === selectedType.toLowerCase()
+      );
+    }
+    
+    console.log("� Filtrelenmiş geometri sayısı:", geometries.length);
+    console.log("📄 Tahmini toplam sayfa:", totalPages);
     
     return { 
       data: geometries,
-      totalCount: totalCount,
+      totalCount: geometries.length,
       currentPage: page,
       pageSize: pageSize,
-      totalPages: totalPages
+      totalPages: Math.max(1, Math.ceil(geometries.length / pageSize))
     };
     
   } catch (error) {
