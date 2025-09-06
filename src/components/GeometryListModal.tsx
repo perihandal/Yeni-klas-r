@@ -146,7 +146,6 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
         loadGeometries(currentPage);
         onDelete(id);
       } catch (error) {
-        console.error('❌ Silme hatası:', error);
         toast.error('❌ Silme işlemi başarısız!');
       }
     }
