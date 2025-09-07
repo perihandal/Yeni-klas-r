@@ -121,7 +121,7 @@ export async function addGeometry(data: {
 
 export async function deleteGeometry(id: number) {
   try {
-    console.log("🗑️ Geometri silme isteği gönderiliyor: ID ile", id);
+    console.log("🗑️ Geometri silme isteği gönderiliyor: ID", id);
 
     const url = `${API_BASE}/${id}`;
     console.log("🌐 Silme URL'i:", url);
@@ -132,13 +132,22 @@ export async function deleteGeometry(id: number) {
     });
 
     console.log("📥 Silme API yanıt durumu:", res.status);
+    console.log("📥 Silme API yanıt headers:", res.headers);
 
-    if (!res.ok) {
+    // 204 No Content da başarılı kabul edilir (silme işlemlerinde sık kullanılır)
+    if (!res.ok && res.status !== 204) {
       const errorText = await res.text();
       console.error("❌ Silme API hata detayı:", errorText);
       throw new Error(`HTTP ${res.status}: ${errorText}`);
     }
 
+    // 204 durumunda response body olmayabilir
+    if (res.status === 204) {
+      console.log("✅ Silme işlemi başarılı (204 No Content)");
+      return { success: true, message: "Geometri başarıyla silindi" };
+    }
+
+    // Diğer başarılı durumlar için JSON parse et
     const responseData = await res.json();
     console.log("✅ Silme API başarılı yanıt:", responseData);
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getGeometriesWithPagination, deleteGeometry } from '../api';
+import { getGeometriesWithPagination } from '../api';
 import { toast } from 'react-toastify';
 import './GeometryListModal.css';
 
@@ -140,14 +140,9 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
     }
     
     if (window.confirm('Bu geometriyi silmek istediğinizden emin misiniz?')) {
-      try {
-        await deleteGeometry(id);
-        // Listeyi yenile
-        loadGeometries(currentPage);
-        onDelete(id);
-      } catch (error) {
-        toast.error('❌ Silme işlemi başarısız!');
-      }
+      // Parent component'teki silme fonksiyonunu çağır (API çağrısı da orada yapılacak)
+      onDelete(id);
+      // Modal kendisi listeyi yenileyecek çünkü parent geometrileri güncelleyecek
     }
   };
 

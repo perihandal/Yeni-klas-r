@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { getAllGeometries, addGeometry, deleteGeometry, updateGeometry } from "./api";
-import { testGeocoding, getAddressFromWkt } from "./utils/geocodingUtils";
+import { getAddressFromWkt } from "./utils/geocodingUtils";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -208,9 +208,10 @@ const App: React.FC = () => {
        console.log("🗑️ Geometri siliniyor, ID:", id);
        toast.info("🗑️ Geometri siliniyor...");
        
-       await deleteGeometry(id);
+       const result = await deleteGeometry(id);
+       console.log("🗑️ Silme sonucu:", result);
        
-       // Frontend'den kaldır
+       // Frontend'den kaldır - Bu haritayı otomatik olarak güncelleyecek
        setGeometries(prev => {
          const newGeometries = prev.filter(g => g.id !== id);
          console.log("🗑️ Frontend'den kaldırıldı, yeni liste uzunluğu:", newGeometries.length);
@@ -220,15 +221,19 @@ const App: React.FC = () => {
        
        toast.success("✅ Geometri başarıyla silindi!");
        
-       // 2 saniye sonra backend'den yenile (silme işleminin tamamlanması için)
-       setTimeout(async () => {
-         console.log("🔄 Backend'den geometriler yenileniyor...");
-         await refreshGeometries();
-       }, 2000);
-       
      } catch (error) {
        console.error("❌ Geometri silinirken hata:", error);
-       toast.error("❌ Geometri silinirken bir hata oluştu!");
+       console.error("❌ Hata tipi:", typeof error);
+       console.error("❌ Hata mesajı:", (error as any)?.message);
+       console.error("❌ Hata stack:", (error as any)?.stack);
+       
+       // Daha detaylı hata mesajı
+       let errorMessage = "❌ Geometri silinirken bir hata oluştu!";
+       if ((error as any)?.message) {
+         errorMessage += ` (${(error as any).message})`;
+       }
+       
+       toast.error(errorMessage);
      }
    };
 
@@ -373,20 +378,6 @@ const App: React.FC = () => {
         <div className="top-bar">
           <GeometryTypeSelector value={geometryType} onChange={setGeometryType} />
           <SearchBar value={search} onChange={setSearch} onSearch={handleSearch} />
-          <button 
-            onClick={testGeocoding}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            🧪 Geocoding Test
-          </button>
         </div>
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
           {error && (
