@@ -2,16 +2,13 @@ const API_BASE = "https://localhost:7136/api/Geometry";
 
 export async function getAllGeometries() {
   try {
-    console.log("🌐 API isteği gönderiliyor:", API_BASE);
     const res = await fetch(API_BASE);
-    console.log("📥 API yanıt durumu:", res.status);
     
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: Veriler alınamadı`);
     }
     
     const data = await res.json();
-    console.log("📋 Ham API verisi:", data);
     
     // Backend'den gelen veri formatını normalize et
     let geometries = data;
@@ -28,24 +25,6 @@ export async function getAllGeometries() {
     else if (data && typeof data === 'object') {
       geometries = [data];
     }
-    
-    console.log("🔄 Backend'den gelen geometriler:", geometries);
-    
-    console.log("🔍 Geometri detayları:", geometries.map((g: any) => ({
-      id: g.id,
-      name: g.name,
-      type: g.type,
-      wkt: g.wkt?.substring(0, 50) + "...",
-      wktLength: g.wkt?.length,
-      hasWkt: !!g.wkt,
-      hasId: !!g.id,
-      phone: g.phone,
-      description: g.description,
-      fullAddress: g.fullAddress,
-      photoBase64: g.photoBase64 ? `Var (${g.photoBase64.length} karakter)` : "Yok",
-      photoBase64Start: g.photoBase64 ? g.photoBase64.substring(0, 30) + "..." : "Yok",
-      openingHours: g.openingHours
-    })));
     
     return { data: geometries };
     
@@ -87,31 +66,20 @@ export async function addGeometry(data: {
       endPoint: null
     };
 
-    console.log("📤 API'ye gönderilen veri:", requestBody);
-    console.log("📤 WKT uzunluğu:", data.wkt?.length);
-    console.log("📤 WKT formatı:", data.wkt);
-    console.log("📤 Geometri tipi:", data.type);
-    console.log("📤 Fotoğraf base64 uzunluğu:", data.photoBase64?.length);
-
     const res = await fetch(API_BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody)
     });
 
-    console.log("📥 API yanıt durumu:", res.status);
-    
     if (!res.ok) {
       const errorText = await res.text();
-      console.error("❌ API hata detayı:", errorText);
       throw new Error(`HTTP ${res.status}: ${errorText}`);
     }
     
     const responseData = await res.json();
-    console.log("✅ API başarılı yanıt:", responseData);
     return responseData;
   } catch (error) {
-    console.error("❌ API hatası:", error);
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error("Sunucuya bağlanılamadı. Lütfen backend servisinin çalıştığını kontrol edin.");
     }
@@ -121,40 +89,30 @@ export async function addGeometry(data: {
 
 export async function deleteGeometry(id: number) {
   try {
-    console.log("🗑️ Geometri silme isteği gönderiliyor: ID", id);
-
     const url = `${API_BASE}/${id}`;
-    console.log("🌐 Silme URL'i:", url);
 
     const res = await fetch(url, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" }
     });
 
-    console.log("📥 Silme API yanıt durumu:", res.status);
-    console.log("📥 Silme API yanıt headers:", res.headers);
-
     // 204 No Content da başarılı kabul edilir (silme işlemlerinde sık kullanılır)
     if (!res.ok && res.status !== 204) {
       const errorText = await res.text();
-      console.error("❌ Silme API hata detayı:", errorText);
       throw new Error(`HTTP ${res.status}: ${errorText}`);
     }
 
     // 204 durumunda response body olmayabilir
     if (res.status === 204) {
-      console.log("✅ Silme işlemi başarılı (204 No Content)");
       return { success: true, message: "Geometri başarıyla silindi" };
     }
 
     // Diğer başarılı durumlar için JSON parse et
     const responseData = await res.json();
-    console.log("✅ Silme API başarılı yanıt:", responseData);
 
     return responseData;
 
   } catch (error) {
-    console.error("❌ Silme API hatası:", error);
     throw error;
   }
 }

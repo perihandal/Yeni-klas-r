@@ -44,29 +44,6 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
     setLoading(true);
     try {
       const response = await getGeometriesWithPagination(page, pageSize, searchTerm, selectedType);
-      console.log('📋 Pagination API yanıtı:', response);
-      console.log('📋 Gelen geometriler:', response.data);
-      
-      // Her geometrinin detaylarını logla
-      if (response.data && response.data.length > 0) {
-        response.data.forEach((geo: any, index: number) => {
-          console.log(`📍 Geometri ${index + 1}:`, {
-            id: geo.id,
-            name: geo.name,
-            type: geo.type,
-            fullAddress: geo.fullAddress,
-            phone: geo.phone,
-            description: geo.description,
-            openingHours: geo.openingHours,
-            photoBase64: geo.photoBase64 ? 'Var' : 'Yok'
-          });
-          
-          // ID kontrolü
-          if (!geo.id) {
-            console.warn(`⚠️ Geometri ${index + 1} için ID bulunamadı!`);
-          }
-        });
-      }
       
       setFilteredGeometries(response.data || []);
       
@@ -76,19 +53,14 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
       
       // Eğer veri az ise test için minimum 3 sayfa göster (development için)
       if (totalCount <= pageSize && response.data && response.data.length > 0) {
-        console.log('🧪 Test için pagination büyütülüyor');
-        totalCount = Math.max(totalCount, pageSize * 3); // En az 3 sayfa
+        totalCount = Math.max(totalCount, pageSize * 3);
         totalPages = Math.ceil(totalCount / pageSize);
       }
       
       setTotalCount(totalCount);
       setTotalPages(totalPages);
       
-      console.log(`📊 Sayfa ${page} yüklendi: ${response.data?.length || 0} geometri`);
-      console.log(`📊 Toplam sayfa: ${totalPages}, Toplam kayıt: ${totalCount}`);
-      
     } catch (error) {
-      console.error('❌ Geometriler yüklenirken hata:', error);
       toast.error('❌ Geometriler yüklenirken hata oluştu!');
       // Hata durumunda boş liste göster
       setFilteredGeometries([]);
@@ -114,9 +86,8 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
       
       // Debounce search to avoid too many API calls
       const timer = setTimeout(() => {
-        console.log('🔍 Client-side filtreleme yapılıyor:', { searchTerm, selectedType });
         loadGeometries(1);
-      }, 500); // 500ms delay
+      }, 500);
       
       return () => clearTimeout(timer);
     } else if (isOpen && searchTerm === '' && selectedType === 'all') {
@@ -134,7 +105,6 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
   // Geometri silme
   const handleDelete = async (id: number) => {
     if (!id) {
-      console.error('❌ Silme işlemi için geçerli ID bulunamadı!');
       toast.error('❌ Bu geometri silinemez - ID bilgisi eksik!');
       return;
     }
@@ -322,13 +292,9 @@ const GeometryListModal: React.FC<GeometryListModalProps> = ({
                                alt={geometry.name || 'Geometri fotoğrafı'}
                                className="geometry-list-modal-card-photo-img"
                                onLoad={() => {
-                                 console.log('✅ Fotoğraf başarıyla yüklendi:', geometry.name);
+                                 // Fotoğraf yüklendi
                                }}
                                onError={(e) => {
-                                 console.error('❌ Fotoğraf yüklenemedi:', geometry.name);
-                                 console.error('❌ Base64 uzunluğu:', geometry.photoBase64?.length);
-                                 console.error('❌ Base64 başlangıcı:', geometry.photoBase64?.substring(0, 50));
-                                 console.error('❌ Kullanılan src:', geometry.photoBase64?.startsWith('data:') ? geometry.photoBase64 : `data:image/jpeg;base64,${geometry.photoBase64}`);
                                  e.currentTarget.style.display = 'none';
                                  // Fotoğraf yüklenemezse placeholder göster
                                  const placeholder = e.currentTarget.parentElement;

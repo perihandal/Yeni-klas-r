@@ -29,14 +29,11 @@ export interface GeocodingResult {
  */
 export async function getAddressFromCoords(lat: number, lon: number): Promise<GeocodingResult | null> {
   try {
-    console.log('🌍 Adres sorgulanıyor:', { lat, lon });
-    
-    // Nominatim API'sine istek gönder
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=tr,en`,
       {
         headers: {
-          'User-Agent': 'MapApp/1.0' // Nominatim için gerekli
+          'User-Agent': 'MapApp/1.0'
         }
       }
     );
@@ -48,7 +45,6 @@ export async function getAddressFromCoords(lat: number, lon: number): Promise<Ge
     const data = await response.json();
     
     if (!data || !data.display_name) {
-      console.warn('⚠️ Adres bulunamadı:', { lat, lon });
       return null;
     }
     
@@ -59,17 +55,9 @@ export async function getAddressFromCoords(lat: number, lon: number): Promise<Ge
       lon: data.lon
     };
     
-    console.log('✅ Adres bulundu:', {
-      displayName: result.displayName,
-      city: result.address.city || result.address.town || result.address.village,
-      district: result.address.district || result.address.county,
-      country: result.address.country
-    });
-    
     return result;
     
   } catch (error) {
-    console.error('❌ Geocoding hatası:', error);
     return null;
   }
 }
@@ -85,7 +73,6 @@ export function extractCoordsFromWkt(wkt: string): { lat: number; lon: number } 
       return null;
     }
     
-    // POINT formatını parse et
     const pointMatch = wkt.match(/POINT\s*\(\s*([+-]?\d*\.?\d+)\s+([+-]?\d*\.?\d+)\s*\)/i);
     if (pointMatch) {
       const lon = parseFloat(pointMatch[1]);
@@ -93,7 +80,6 @@ export function extractCoordsFromWkt(wkt: string): { lat: number; lon: number } 
       return { lat, lon };
     }
     
-    // POLYGON formatından merkez nokta çıkar (basit yaklaşım)
     const polygonMatch = wkt.match(/POLYGON\s*\(\s*\(\s*([^)]+)\s*\)/i);
     if (polygonMatch) {
       const coordsString = polygonMatch[1];
@@ -102,14 +88,12 @@ export function extractCoordsFromWkt(wkt: string): { lat: number; lon: number } 
         return { lat: parseFloat(lat), lon: parseFloat(lon) };
       });
       
-      // Basit merkez hesaplama (tüm noktaların ortalaması)
       const centerLat = coords.reduce((sum, coord) => sum + coord.lat, 0) / coords.length;
       const centerLon = coords.reduce((sum, coord) => sum + coord.lon, 0) / coords.length;
       
       return { lat: centerLat, lon: centerLon };
     }
     
-    // LINESTRING formatından merkez nokta çıkar
     const lineStringMatch = wkt.match(/LINESTRING\s*\(\s*([^)]+)\s*\)/i);
     if (lineStringMatch) {
       const coordsString = lineStringMatch[1];
@@ -118,19 +102,15 @@ export function extractCoordsFromWkt(wkt: string): { lat: number; lon: number } 
         return { lat: parseFloat(lat), lon: parseFloat(lon) };
       });
       
-      // LineString'in merkez noktasını hesapla (tüm noktaların ortalaması)
       const centerLat = coords.reduce((sum, coord) => sum + coord.lat, 0) / coords.length;
       const centerLon = coords.reduce((sum, coord) => sum + coord.lon, 0) / coords.length;
       
-      console.log('📍 LineString merkez noktası:', { lat: centerLat, lon: centerLon });
       return { lat: centerLat, lon: centerLon };
     }
     
-    console.warn('⚠️ WKT formatı desteklenmiyor:', wkt.substring(0, 50));
     return null;
     
   } catch (error) {
-    console.error('❌ WKT parse hatası:', error);
     return null;
   }
 }
@@ -142,22 +122,15 @@ export function extractCoordsFromWkt(wkt: string): { lat: number; lon: number } 
  */
 export async function getAddressFromWkt(wkt: string): Promise<GeocodingResult | null> {
   try {
-    console.log('🌍 WKT\'den adres alınıyor:', wkt);
-    console.log('🌍 WKT tipi:', typeof wkt);
-    console.log('🌍 WKT uzunluk:', wkt?.length);
-    
     const coords = extractCoordsFromWkt(wkt);
-    console.log('🌍 Çıkarılan koordinatlar:', coords);
     
     if (!coords) {
-      console.warn('⚠️ WKT\'den koordinat çıkarılamadı:', wkt);
       return null;
     }
     
     return await getAddressFromCoords(coords.lat, coords.lon);
     
   } catch (error) {
-    console.error('❌ WKT geocoding hatası:', error);
     return null;
   }
 }
@@ -166,19 +139,16 @@ export async function getAddressFromWkt(wkt: string): Promise<GeocodingResult | 
  * Test fonksiyonu - İstanbul koordinatları ile test
  */
 export async function testGeocoding(): Promise<void> {
-  console.log('🧪 Geocoding test başlatılıyor...');
-  
-  // İstanbul Sultanahmet koordinatları
   const testCoords = { lat: 41.0082, lon: 28.9784 };
   
   try {
     const result = await getAddressFromCoords(testCoords.lat, testCoords.lon);
     if (result) {
-      console.log('✅ Test başarılı:', result);
+      // Test başarılı
     } else {
-      console.log('❌ Test başarısız: Adres bulunamadı');
+      // Test başarısız: Adres bulunamadı
     }
   } catch (error) {
-    console.error('❌ Test hatası:', error);
+    // Test hatası
   }
 }

@@ -41,44 +41,19 @@ const App: React.FC = () => {
 
   // Debug için state değişikliklerini takip et
   useEffect(() => {
-    console.log(`🔍 Debug - addMode: ${addMode}, popupOpen: ${popupOpen}, geometryType: ${addMode && !popupOpen ? geometryType : ""}`);
+    // Debug bilgileri kaldırıldı
   }, [addMode, popupOpen, geometryType]);
 
   // Geometrileri çek
   useEffect(() => {
-    console.log("Geometriler yükleniyor...");
     getAllGeometries()
       .then((res) => {
-        console.log("API yanıtı:", res);
         const geometryData = res.data || res || [];
-        console.log("Geometri verisi:", geometryData);
-        console.log("Geometri sayısı:", geometryData.length);
-        
-        if (geometryData.length > 0) {
-          console.log("🔍 Backend'den gelen geometri verileri analizi:");
-          geometryData.forEach((g: any, index: number) => {
-            console.log(`📍 Geometri ${index + 1}:`, {
-              name: g.name,
-              type: g.type,
-              wkt: g.wkt?.substring(0, 50) + "...",
-              hasPolygonType: g.type === 'Polygon',
-              hasPolygonWkt: g.wkt && g.wkt.toUpperCase().startsWith('POLYGON'),
-              willBeProcessed: g.type === 'Polygon' || (g.wkt && g.wkt.toUpperCase().startsWith('POLYGON'))
-            });
-          });
-          
-          const polygonCount = geometryData.filter((g: any) => 
-            g.type === 'Polygon' || (g.wkt && g.wkt.toUpperCase().startsWith('POLYGON'))
-          ).length;
-          
-          console.log(`📊 Toplam ${geometryData.length} geometri, bunlardan ${polygonCount} tanesi polygon olarak işlenecek`);
-        }
         
         setGeometries(geometryData);
         setError(null);
       })
       .catch((err) => {
-        console.warn("Backend bağlantısı başarısız:", err.message);
         setError(err.message);
         // Backend bağlantısı olmasa da harita çalışsın
         setGeometries([]);
@@ -97,30 +72,22 @@ const App: React.FC = () => {
   // Test fonksiyonu kaldırıldı - gerçek veriler kullanılacak
 
   const refreshGeometries = async () => {
-    console.log("🔄 Geometriler yenileniyor...");
     try {
       const res = await getAllGeometries();
-      console.log("🔄 API Response:", res);
       
       const geometryData = res.data || res || [];
-      console.log("📊 Yeni geometri verisi:", geometryData);
-      console.log("📊 Geometri sayısı:", geometryData.length);
       
       setGeometries(geometryData);
       setError(null);
       
-      console.log(`✅ ${geometryData.length} geometri başarıyla yüklendi`);
-      
       // Test geometrisi ekle (eğer hiç geometri yoksa)
       if (geometryData.length === 0) {
-        console.log("📍 Test geometrisi ekleniyor...");
         const testGeometry = {
           name: "Test Nokta",
           type: "Point", 
-          wkt: "POINT(32.8597 39.9334)" // Ankara koordinatları
+          wkt: "POINT(32.8597 39.9334)"
         };
         setGeometries([testGeometry]);
-        console.log("📍 Test geometrisi eklendi:", testGeometry);
       }
       
     } catch (err: any) {
@@ -135,8 +102,6 @@ const App: React.FC = () => {
       return;
     }
     
-    console.log("🔍 Arama yapılıyor:", search);
-    
     // Geometriler içinde arama yap
     const searchResults = geometries.filter(geometry => 
       geometry.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -145,8 +110,6 @@ const App: React.FC = () => {
       geometry.description?.toLowerCase().includes(search.toLowerCase())
     );
     
-    console.log("🎯 Arama sonuçları:", searchResults);
-    
     if (searchResults.length === 0) {
       toast.error(`"${search}" için sonuç bulunamadı!`);
       return;
@@ -154,7 +117,6 @@ const App: React.FC = () => {
     
     // İlk sonuca odaklan ve zoom yap
     const firstResult = searchResults[0];
-    console.log("📍 İlk sonuca odaklanılıyor:", firstResult);
     
     // Arama sonuçlarını highlights için state'e set et
     setGeometries(prev => prev.map(g => ({
@@ -173,7 +135,6 @@ const App: React.FC = () => {
         // 3 saniye sonra zoom state'ini temizle
         setTimeout(() => {
           setZoomToGeometry(null);
-          console.log('🧹 Arama zoom state temizlendi');
         }, 3000);
       }, 200);
     }
@@ -186,7 +147,6 @@ const App: React.FC = () => {
         ...g,
         highlighted: false
       })));
-      console.log('🧹 Arama highlightlari temizlendi');
     }, 10000);
   };
 
